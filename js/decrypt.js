@@ -66,7 +66,7 @@ decFile.onchange = () => {
 decBtn.onclick = async () => {
   const file = decFile.files[0];
   const pw   = decPwd.value;
-  if (!file || !pw) return alert('Select an .aes file and enter password.');
+  if (!file || !pw) return alert('Select a .vault file and enter a password.');
 
   decStatus.style.display = 'block';
   decPwd.disabled = true;

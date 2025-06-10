@@ -79,7 +79,7 @@ encBtn.onclick = async () => {
   const metaBytes = enc.encode(JSON.stringify(meta));
   const hdrSize   = 4 + 1 + 4 + metaBytes.length;  // magic + ver + len + meta
   const writer = streamSaver.createWriteStream(
-    file.name + '.aes',
+    file.name + '.vault',
     {
       size: hdrSize + file.size + Math.ceil(file.size / CHUNK) * 28
     }
