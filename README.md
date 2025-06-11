@@ -4,7 +4,7 @@
 
 <br>
 
-**Securely <span style="color: #0d6dfd">encrypt</span> and <span style="color: #198754">decrypt</span> your files directly in your browser.**
+Securely <span style="color: #0d6dfd">encrypt</span> and <span style="color: #198754">decrypt</span> your files directly in your browser.
 
 All processing happens locally on your device — no uploads, no servers involved.
 
