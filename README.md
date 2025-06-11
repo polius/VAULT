@@ -1,15 +1,10 @@
 <div align="center">
 
-# Vault
+<h1 style="color: #ffad32">VAULT</h1>
 
 <br>
 
-<img width="40" src="images/icon.png">
-
-<br>
-<br>
-
-**Securily encrypt and decrypt your files directly in your browser**
+**Securely <span style="color: #0d6dfd">encrypt</span> and <span style="color: #198754">decrypt</span> your files directly in your browser.**
 
 All processing happens locally on your device — no uploads, no servers involved.
 

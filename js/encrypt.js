@@ -42,16 +42,24 @@ encPwdToggle.addEventListener('click', () => {
   }
 });
 
+encFile.onchange = () => {
+  encPwd.focus();
+}
+
 async function deriveKey(pw, salt, iter) {
   const base = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
-    { name:'PBKDF2', salt, iterations:iter, hash:'SHA-256' },
-    base, { name:'AES-GCM', length:256 }, false, ['encrypt']
+    {
+      name: 'PBKDF2',
+      salt,
+      iterations: iter,
+      hash: 'SHA-512'
+    },
+    base,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt']
   );
-}
-
-encFile.onchange = () => {
-  encPwd.focus();
 }
 
 encBtn.onclick = async () => {
@@ -73,7 +81,9 @@ encBtn.onclick = async () => {
     size     : file.size,
     salt     : btoa(String.fromCharCode(...salt)),
     iterations: iter,
-    chunk    : CHUNK
+    chunk    : CHUNK,
+    kdf      : "PBKDF2",
+    hash     : "SHA-512",
   };
 
   const metaBytes = enc.encode(JSON.stringify(meta));

@@ -29,14 +29,23 @@ decPwdToggle.addEventListener('click', () => {
   }
 });
 
+decFile.onchange = () => {
+  decPwd.focus();
+}
+
 function b64u8(b) { return Uint8Array.from(atob(b), c => c.charCodeAt(0)) }
 
 async function deriveKey(pw, salt, iter) {
   const base = await crypto.subtle.importKey('raw', decEnc.encode(pw), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
-    { name:'PBKDF2', salt, iterations: iter, hash:'SHA-256' },
+    {
+      name: 'PBKDF2',
+      salt,
+      iterations: iter,
+      hash: 'SHA-512'
+    },
     base,
-    { name:'AES-GCM', length:256 },
+    { name: 'AES-GCM', length: 256 },
     false,
     ['decrypt']
   );
@@ -59,10 +68,6 @@ function makeReader(rdr) {
   };
 }
 
-decFile.onchange = () => {
-  decPwd.focus();
-}
-
 decBtn.onclick = async () => {
   const file = decFile.files[0];
   const pw   = decPwd.value;
@@ -83,14 +88,14 @@ decBtn.onclick = async () => {
     const meta = JSON.parse(decDec.decode(await rN(hdrLen)));
 
     const key = await deriveKey(pw, b64u8(meta.salt), meta.iterations);
-    const wr = streamSaver.createWriteStream(meta.filename, {size:meta.size}).getWriter();
+    const wr = streamSaver.createWriteStream(meta.filename, { size: meta.size }).getWriter();
 
     let done = 0;
     while (done < meta.size) {
       const iv = await rN(12);
       const chunk = Math.min(meta.chunk, meta.size - done);
       const ct = await rN(chunk+16);
-      const pt = new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, ct));
+      const pt = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct));
       await wr.write(pt);
       done += pt.length;
       const pct = ((done / meta.size) * 100).toFixed(1);

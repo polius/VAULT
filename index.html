@@ -15,11 +15,11 @@
 <body>
   <div class="container py-5">
     <a href="/" style="text-decoration: none; color: inherit">
-      <h1 style="text-align: center; margin-bottom: 10px"><img src="images/icon.png" width="50"/></h1>
-      <h1 style="text-align: center; font-weight: 600">VAULT</h1>
-      <p class="text-center" style="margin-top:10px; margin-bottom: 40px; font-size: 0.9em;">AES-GCM + PBKDF2/SHA-256</p>
+      <h1 style="text-align: center; margin-bottom: 10px"><img src="images/icon.png" width="40"/></h1>
+      <h1 style="text-align: center; font-weight: 600; color: #ffad32">VAULT</h1>
+      <p class="text-center" style="margin-top:10px; margin-bottom: 40px; font-size: 0.9em; color: coral">AES-GCM + PBKDF2/SHA-512</p>
     </a>
-    <p class="text-center px-1" style="margin-top:20px; margin-bottom: 50px; font-size: 1.2em; font-weight: 600">Securily encrypt and decrypt your files directly in your browser</p>
+    <p class="text-center px-2" style="margin-top:20px; margin-bottom: 50px; font-size: 1.2em">Securely <span class="text-primary" style="font-weight: 500">encrypt</span> and <span class="text-success" style="font-weight: 500">decrypt</span> your files directly in your browser.</p>
 
     <div class="row gy-4">
       <div class="col-lg-6">
@@ -34,10 +34,10 @@
             <div class="input-group">
               <input type="password" id="encPwd" class="form-control" placeholder="Password" autocomplete="new-password" />
               <button class="btn btn-outline-secondary" type="button" id="encPwdGenerate" title="Generate random password and copy to clipboard">
-                <i class="bi bi-key-fill"></i>
+                <i class="bi bi-key-fill" style="color: #b0b0b0"></i>
               </button>
               <button class="btn btn-outline-secondary" type="button" id="encPwdToggle" title="Show/Hide password">
-                <i class="bi bi-eye-fill" id="encPwdToggleIcon"></i>
+                <i class="bi bi-eye-fill" style="color: #b0b0b0" id="encPwdToggleIcon"></i>
               </button>
             </div>
           </div>
@@ -63,7 +63,7 @@
             <div class="input-group">
               <input type="password" id="decPwd" class="form-control" placeholder="Password" autocomplete="new-password" />
               <button class="btn btn-outline-secondary" type="button" id="decPwdToggle" title="Show/Hide password">
-                <i class="bi bi-eye-fill" id="decPwdToggleIcon"></i>
+                <i class="bi bi-eye-fill" style="color: #b0b0b0" id="decPwdToggleIcon"></i>
               </button>
             </div>
           </div>
