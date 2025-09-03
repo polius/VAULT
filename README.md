@@ -2,13 +2,17 @@
 <img src="src/images/icon.png" alt="VAULT Logo" width="45">
 <h1 align="center" style="color: #ffad32">VAULT</h1>
 
+**Securely <span style="color: #0d6dfd">encrypt</span> and <span style="color: #198754">decrypt</span> your files directly in your browser.**
+
 <p align="center">
 <a href="https://github.com/polius/vault/actions/workflows/release.yml"><img src="https://github.com/polius/vault/actions/workflows/release.yml/badge.svg"></a>&nbsp;<a href="https://github.com/polius/vault/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/polius/vault"></a>&nbsp;<a href="https://hub.docker.com/r/poliuscorp/vault"><img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/poliuscorp/vault"></a>
 </p>
 
-**Securely <span style="color: #0d6dfd">encrypt</span> and <span style="color: #198754">decrypt</span> your files directly in your browser.**
+<br>
 
 *All processing happens **<span style="color: #ffad32">locally</span>** on your device — no uploads, no servers involved.*
+
+<br>
 
 ![VAULT](src/images//screenshot.png)
 </div>
