@@ -87,21 +87,15 @@ encBtn.onclick = async () => {
   };
 
   const metaBytes = enc.encode(JSON.stringify(meta));
-  const hdrSize   = 4 + 1 + 4 + metaBytes.length;  // magic + ver + len + meta
-  const writer = streamSaver.createWriteStream(
-    file.name + '.vault',
-    {
-      size: hdrSize + file.size + Math.ceil(file.size / CHUNK) * 28
-    }
-  ).getWriter();
+  const chunks = [];
 
   // Header
-  await writer.write(enc.encode('AES1'));  // magic
-  await writer.write(new Uint8Array([1])); // version
+  chunks.push(enc.encode('AES1'));  // magic
+  chunks.push(new Uint8Array([1])); // version
   const lenBuf = new Uint8Array(4);
   new DataView(lenBuf.buffer).setUint32(0, metaBytes.length, true);
-  await writer.write(lenBuf);
-  await writer.write(metaBytes);
+  chunks.push(lenBuf);
+  chunks.push(metaBytes);
 
   // File, chunk-by-chunk
   let offset = 0;
@@ -110,16 +104,29 @@ encBtn.onclick = async () => {
     const chunk = new Uint8Array(await blob.arrayBuffer());
     const iv    = crypto.getRandomValues(new Uint8Array(12));
     const ct    = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, chunk));
-    await writer.write(iv);
-    await writer.write(ct);
+    chunks.push(iv);
+    chunks.push(ct);
+
     offset += chunk.length;
     const pct = ((offset / file.size) * 100).toFixed(1);
     encBar.style.width = pct + '%';
     encBar.textContent = pct + '%';
   }
-  await writer.close();
+
+  // Finalize
+  const finalBlob = new Blob(chunks, { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(finalBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = file.name + '.vault';
+  a.click();
+  URL.revokeObjectURL(url);
+
+  // UI reset
   encBar.classList.remove('bg-warning', 'text-dark', 'progress-bar-striped', 'progress-bar-animated');
   encBar.classList.add('bg-success', 'text-white');
   encLog.style.display = 'block';
   encLog.textContent = '✅ File successfully encrypted.';
+  encPwd.disabled = false;
+  encBtn.disabled = false;
 };

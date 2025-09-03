@@ -4,22 +4,22 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Vault Encryption System</title>
-  <meta name="description" content="Securily encrypt and decrypt your files directly in your browser." />
+  <meta name="description" content="Securely encrypt and decrypt your files directly in your browser." />
   <meta name="author" content="Pol Alzina" />
   <meta name="robots" content="index, follow" />
-  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <link rel="icon" type="image/x-icon" href="images/favicon.ico">
   <link href="css/bootstrap.min.css" rel="stylesheet" />
   <link href="css/bootstrap-icons.min.css" rel="stylesheet" />
   <link href="css/style.css" rel="stylesheet" />
 </head>
-<body>
-  <div class="container py-5">
+<body class="d-flex align-items-center justify-content-center px-3 py-5">
+  <div class="container">
     <a href="/" style="text-decoration: none; color: inherit">
       <h1 style="text-align: center; margin-bottom: 10px"><img src="images/icon.png" width="40"/></h1>
-      <h1 style="text-align: center; font-weight: 600; color: #ffad32">VAULT</h1>
+      <h1 style="text-align: center; font-weight: 600; color: #f90; margin-top: 12px">VAULT</h1>
       <p class="text-center" style="margin-top:10px; margin-bottom: 40px; font-size: 0.9em; color: coral">AES-GCM + PBKDF2/SHA-512</p>
     </a>
-    <p class="text-center px-2" style="margin-top:20px; margin-bottom: 50px; font-size: 1.2em">Securely <span class="text-primary" style="font-weight: 500">encrypt</span> and <span class="text-success" style="font-weight: 500">decrypt</span> your files directly in your browser.</p>
+    <p class="text-center px-2" style="margin-top:20px; margin-bottom: 40px; font-size: 1.2em">Securely <span class="text-primary" style="font-weight: 500">encrypt</span> and <span class="text-success" style="font-weight: 500">decrypt</span> your files directly in your browser.</p>
 
     <div class="row gy-4">
       <div class="col-lg-6">
@@ -77,13 +77,11 @@
         </div>
       </div>
     </div>
-    <p class="px-1" style="text-align: center; font-size: 0.95em; margin-top:40px; margin-bottom: 0px;">All processing happens <span style="color: #ffad32">locally</span> on your device — no uploads, no servers involved.</p>
+    <p class="px-1" style="text-align: center; font-size: 0.95em; margin-top:40px; margin-bottom: 0px;">All processing happens <span style="color: #f90">locally</span> on your device — no uploads, no servers involved.</p>
     <p style="text-align: center; font-size: 0.9em; margin-top:15px; margin-bottom: 0px;"><a style="text-decoration: none" href="https://github.com/polius/vault">Github</a></p>
   </div>
 
   <script src="js/bootstrap.bundle.min.js"></script>
-  <script src="js/StreamSaver.min.js"></script>
-  <script>streamSaver.mitm = location.origin + '/mitm.html';</script>
   <script type="module" src="js/encrypt.js"></script>
   <script type="module" src="js/decrypt.js"></script>
 </body>

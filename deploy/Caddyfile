@@ -1,0 +1,3 @@
+yourdomain.com {
+	reverse_proxy vault:80
+}

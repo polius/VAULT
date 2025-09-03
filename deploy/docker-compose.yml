@@ -1,0 +1,19 @@
+services:
+  caddy:
+    image: caddy
+    container_name: vault-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - vault:/data
+    restart: unless-stopped
+
+  vault:
+    image: poliuscorp/vault
+    container_name: vault
+    restart: unless-stopped
+
+volumes:
+  vault:

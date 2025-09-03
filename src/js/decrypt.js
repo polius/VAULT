@@ -51,23 +51,6 @@ async function deriveKey(pw, salt, iter) {
   );
 }
 
-function makeReader(rdr) {
-  let buf = new Uint8Array();
-  return async n => {
-    while (buf.length < n) {
-      const {done, value} = await rdr.read();
-      if (done) throw new Error('Truncated file');
-      const tmp = new Uint8Array(buf.length + value.length);
-      tmp.set(buf);
-      tmp.set(value, buf.length);
-      buf = tmp;
-    }
-    const out = buf.slice(0, n);
-    buf = buf.slice(n);
-    return out;
-  };
-}
-
 decBtn.onclick = async () => {
   const file = decFile.files[0];
   const pw   = decPwd.value;
@@ -77,43 +60,69 @@ decBtn.onclick = async () => {
   decPwd.disabled = true;
   decBtn.disabled = true;
 
-  const rdr = file.stream().getReader();
-  const rN = makeReader(rdr);
-
   try {
-    if (decDec.decode(await rN(4)) !== 'AES1') throw new Error('Bad magic');
-    if ((await rN(1))[0] !== 1) throw new Error('Bad version');
+    // Read entire file into memory
+    const data = new Uint8Array(await file.arrayBuffer());
+    let offset = 0;
 
-    const hdrLen = new DataView((await rN(4)).buffer).getUint32(0, true);
-    const meta = JSON.parse(decDec.decode(await rN(hdrLen)));
+    // Header
+    const magic = new TextDecoder().decode(data.slice(offset, offset + 4)); offset += 4;
+    if (magic !== 'AES1') throw new Error('Bad magic');
+
+    const version = data[offset]; offset += 1;
+    if (version !== 1) throw new Error('Bad version');
+
+    const hdrLen = new DataView(data.buffer, offset, 4).getUint32(0, true);
+    offset += 4;
+
+    const metaStr = new TextDecoder().decode(data.slice(offset, offset + hdrLen));
+    offset += hdrLen;
+    const meta = JSON.parse(metaStr);
 
     const key = await deriveKey(pw, b64u8(meta.salt), meta.iterations);
-    const wr = streamSaver.createWriteStream(meta.filename, { size: meta.size }).getWriter();
 
+    // Collect decrypted chunks
+    const chunks = [];
     let done = 0;
+
     while (done < meta.size) {
-      const iv = await rN(12);
-      const chunk = Math.min(meta.chunk, meta.size - done);
-      const ct = await rN(chunk+16);
+      const iv = data.slice(offset, offset + 12); offset += 12;
+      const chunkSize = Math.min(meta.chunk, meta.size - done);
+      const ct = data.slice(offset, offset + chunkSize + 16); offset += chunkSize + 16;
+
       const pt = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct));
-      await wr.write(pt);
+      chunks.push(pt);
+
       done += pt.length;
       const pct = ((done / meta.size) * 100).toFixed(1);
       decBar.style.width = pct + '%';
       decBar.textContent = pct + '%';
     }
-    await wr.close();
+
+    // Build final Blob and trigger download
+    const finalBlob = new Blob(chunks, { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(finalBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = meta.filename;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // UI update
     decBar.classList.remove('bg-warning', 'text-dark', 'progress-bar-striped', 'progress-bar-animated');
     decBar.classList.add('bg-success', 'text-white');
     decLog.style.display = 'block';
     decLog.textContent = '✅ File successfully decrypted.';
-  } catch(e) {
+  } catch (e) {
+    console.log(e.message);
+    decLog.textContent = '❌ Incorrect password or file is corrupted.';
+    decLog.style.display = 'block';
+    setTimeout(() => {
+      decPwd.value = '';
+      decPwd.focus();
+    }, 100);
+  } finally {
     decPwd.disabled = false;
     decBtn.disabled = false;
-    decPwd.value = '';
-    decPwd.focus();
-    decLog.style.display = 'block';
-    decLog.textContent = '❌ Incorrect password or file is corrupted.';
-    console.log(e.message)
   }
 };

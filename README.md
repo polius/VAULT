@@ -1,21 +1,62 @@
 <div align="center">
-
-<h1 style="color: #ffad32">VAULT</h1>
-
-<br>
+<img src="src/images/icon.png" alt="VAULT Logo" width="45">
+<h1 align="center" style="color: #ffad32">VAULT</h1>
 
 **Securely <span style="color: #0d6dfd">encrypt</span> and <span style="color: #198754">decrypt</span> your files directly in your browser.**
 
-All processing happens locally on your device — no uploads, no servers involved.
+<p align="center">
+<a href="https://github.com/polius/vault/actions/workflows/release.yml"><img src="https://github.com/polius/vault/actions/workflows/release.yml/badge.svg"></a>&nbsp;<a href="https://github.com/polius/vault/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/polius/vault"></a>&nbsp;<a href="https://hub.docker.com/r/poliuscorp/vault"><img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/poliuscorp/vault"></a>
+</p>
 
-<br>
+*All processing happens **<span style="color: #ffad32">locally</span>** on your device — no uploads, no servers involved.*
 
-[![Vault](https://img.shields.io/badge/Website-736e9b?style=for-the-badge)](https://vault.alzina.dev)
+![VAULT](src/images//screenshot.png)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
+## Installation
 
-<br>
+The recommended installation method is **Docker**.  
 
-![Vault](images/screenshot.png)
+#### Run with Docker CLI
+
+```bash
+docker run -d --name vault -p 80:80 poliuscorp/vault
+```
+
+#### Run with Docker Compose
+
+```yaml
+services:
+  vault:
+    image: poliuscorp/vault
+    container_name: vault
+    ports:
+      - "80:80"
+    restart: unless-stopped
+```
+
+#### Run with Docker Compose (HTTPS Enabled)
+
+- Download both the `docker-compose.yml` and `Caddyfile` from the **deploy** folder.
+- Edit the `Caddyfile` and replace `yourdomain.com` to your actual domain name.
+- Start the stack:
+
+```
+docker-compose up -d
+```
+
+Caddy will automatically obtain and renew SSL certificates for your domain via Let's Encrypt.
+
+- (Optional) To stop and remove the stack:
+
+```
+docker-compose rm -f
+```
+
+## Accessing the Application
+
+Once deployed, open your web browser and visit:
+
+- **HTTP**: http://localhost/
+- **HTTPS**: https://yourdomain.com (if configured)
 
 </div>
