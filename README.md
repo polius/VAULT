@@ -11,6 +11,7 @@
 *All processing happens **<span style="color: #ffad32">locally</span>** on your device — no uploads, no servers involved.*
 
 ![VAULT](src/images//screenshot.png)
+</div>
 
 ## Installation
 
@@ -58,5 +59,3 @@ Once deployed, open your web browser and visit:
 
 - **HTTP**: http://localhost/
 - **HTTPS**: https://yourdomain.com (if configured)
-
-</div>
