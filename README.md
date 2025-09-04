@@ -54,7 +54,7 @@ Caddy will automatically obtain and renew SSL certificates for your domain via L
 - (Optional) To stop and remove the stack:
 
 ```
-docker-compose rm -f
+docker-compose down
 ```
 
 ## Accessing the Application
