@@ -3,83 +3,103 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Vault Encryption System</title>
+  <title>VAULT - Secure Encryption System</title>
   <meta name="description" content="Securely encrypt and decrypt your files directly in your browser." />
   <meta name="author" content="Pol Alzina" />
   <meta name="robots" content="index, follow" />
-  <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="images/logo.svg">
   <link href="css/bootstrap.min.css" rel="stylesheet" />
   <link href="css/bootstrap-icons.min.css" rel="stylesheet" />
   <link href="css/style.css" rel="stylesheet" />
 </head>
 <body class="d-flex align-items-center justify-content-center px-3 py-5">
   <div class="container">
-    <a href="/" style="text-decoration: none; color: inherit">
-      <h1 style="text-align: center; margin-bottom: 10px"><img src="images/icon.png" width="40"/></h1>
-      <h1 style="text-align: center; font-weight: 600; color: #f90; margin-top: 12px">VAULT</h1>
-      <p class="text-center" style="margin-top:10px; margin-bottom: 40px; font-size: 0.9em; color: coral">AES-GCM + PBKDF2/SHA-512</p>
-    </a>
-    <p class="text-center px-2" style="margin-top:20px; margin-bottom: 40px; font-size: 1.2em">Securely <span class="text-primary" style="font-weight: 500">encrypt</span> and <span class="text-success" style="font-weight: 500">decrypt</span> your files directly in your browser.</p>
+    <header class="app-header">
+      <div class="header-brand-wrapper">
+        <a href="/" class="header-brand">
+          <div class="header-icon">
+            <img src="images/logo.svg" alt="VAULT" />
+          </div>
+          <h1 class="app-title">VAULT<span class="app-version">v.1.1.0</span></h1>
+        </a>
+      </div>
+      <p class="app-subtitle">AES-GCM + PBKDF2/SHA-512</p>
+      <p class="app-description">Securely <span class="text-encrypt">encrypt</span> and <span class="text-decrypt">decrypt</span> your files directly in your browser</p>
+    </header>
 
     <div class="row gy-4">
       <div class="col-lg-6">
-        <div class="card p-4">
-          <h3 class="mb-4 text-primary">Encrypt File</h3>
-          <div class="mb-3">
-            <label for="fileInput" class="form-label">Select File</label>
-            <input type="file" class="form-control" id="encFile" required />
+        <div class="card">
+          <div class="card-header">
+            <i class="bi bi-shield-lock"></i>
+            <h3>Encrypt</h3>
           </div>
-          <div class="mb-3">
-            <label for="passwordInput" class="form-label">Password</label>
-            <div class="input-group">
-              <input type="password" id="encPwd" class="form-control" placeholder="Password" autocomplete="new-password" />
-              <button class="btn btn-outline-secondary" type="button" id="encPwdGenerate" title="Generate random password and copy to clipboard">
-                <i class="bi bi-key-fill" style="color: #b0b0b0"></i>
-              </button>
-              <button class="btn btn-outline-secondary" type="button" id="encPwdToggle" title="Show/Hide password">
-                <i class="bi bi-eye-fill" style="color: #b0b0b0" id="encPwdToggleIcon"></i>
-              </button>
+          <div class="card-body">
+            <div class="form-group">
+              <label for="encFile" class="form-label">File</label>
+              <input type="file" class="form-control" id="encFile" required />
             </div>
-          </div>
-          <button id="encBtn" class="btn btn-primary w-100 mt-1">Encrypt & Download</button>
-          <div id="encStatus" class="mt-3" style="display: none">
-            <div class="progress" style="height: 20px">
-              <div id="encBar" class="progress-bar bg-warning text-dark fw-semibold progress-bar-striped progress-bar-animated" style="width:0%">0%</div>
+            <div class="form-group">
+              <label for="encPwd" class="form-label">Password</label>
+              <div class="input-group">
+                <input type="password" id="encPwd" class="form-control" placeholder="Enter password" autocomplete="new-password" />
+                <button class="btn btn-icon" type="button" id="encPwdGenerate" title="Generate password">
+                  <i class="bi bi-key-fill"></i>
+                </button>
+                <button class="btn btn-icon" type="button" id="encPwdToggle" title="Toggle visibility">
+                  <i class="bi bi-eye-fill" id="encPwdToggleIcon"></i>
+                </button>
+              </div>
             </div>
-            <div id="encLog" class="mt-3 small text-muted" style="display: none"></div>
+            <button id="encBtn" class="btn btn-primary">Encrypt</button>
+            <div id="encStatus" class="status-section" style="display: none">
+              <div class="progress">
+                <div id="encBar" class="progress-bar" style="width:0%">0%</div>
+              </div>
+              <div id="encLog" class="status-log" style="display: none"></div>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="col-lg-6">
-        <div class="card p-4">
-          <h3 class="mb-4 text-success">Decrypt File</h3>
-          <div class="mb-3">
-            <label for="encryptedFileInput" class="form-label">Select Encrypted File (.vault)</label>
-            <input type="file" class="form-control" id="decFile" accept=".vault" required />
+        <div class="card">
+          <div class="card-header decrypt">
+            <i class="bi bi-shield-check"></i>
+            <h3>Decrypt</h3>
           </div>
-          <div class="mb-3">
-            <label for="passwordInput" class="form-label">Password</label>
-            <div class="input-group">
-              <input type="password" id="decPwd" class="form-control" placeholder="Password" autocomplete="new-password" />
-              <button class="btn btn-outline-secondary" type="button" id="decPwdToggle" title="Show/Hide password">
-                <i class="bi bi-eye-fill" style="color: #b0b0b0" id="decPwdToggleIcon"></i>
-              </button>
+          <div class="card-body">
+            <div class="form-group">
+              <label for="decFile" class="form-label">Encrypted File (.vault)</label>
+              <input type="file" class="form-control" id="decFile" accept=".vault" required />
             </div>
-          </div>
-          <button id="decBtn" class="btn btn-success w-100 mt-1">Decrypt & Download</button>
-          <div id="decStatus" class="mt-3" style="display: none">
-            <div class="progress" style="height: 20px">
-              <div id="decBar" class="progress-bar bg-warning text-dark fw-semibold progress-bar-striped progress-bar-animated" style="width:0%">0%</div>
+            <div class="form-group">
+              <label for="decPwd" class="form-label">Password</label>
+              <div class="input-group">
+                <input type="password" id="decPwd" class="form-control" placeholder="Enter password" autocomplete="new-password" />
+                <button class="btn btn-icon" type="button" id="decPwdToggle" title="Toggle visibility">
+                  <i class="bi bi-eye-fill" id="decPwdToggleIcon"></i>
+                </button>
+              </div>
             </div>
-            <div id="decLog" class="mt-3 small text-muted" style="display: none"></div>
+            <button id="decBtn" class="btn btn-success">Decrypt</button>
+            <div id="decStatus" class="status-section" style="display: none">
+              <div class="progress">
+                <div id="decBar" class="progress-bar" style="width:0%">0%</div>
+              </div>
+              <div id="decLog" class="status-log" style="display: none"></div>
+            </div>
           </div>
         </div>
       </div>
     </div>
-    <p class="px-1" style="text-align: center; font-size: 0.95em; margin-top:40px; margin-bottom: 0px;">All processing happens <span style="color: #f90">locally</span> on your device — no uploads, no servers involved.</p>
-    <p style="text-align: center; font-size: 0.9em; margin-top:15px; margin-bottom: 0px;"><a style="text-decoration: none" href="https://github.com/polius/vault">Github</a></p>
+    <footer class="app-footer">
+      <p class="footer-note">All processing happens <span class="highlight">locally</span> on your device — no uploads, no servers involved.</p>
+      <p class="footer-link"><a href="https://github.com/polius/vault" target="_blank" rel="noopener noreferrer">View on GitHub</a></p>
+    </footer>
   </div>
+
+  <div id="toast-container"></div>
 
   <script src="js/bootstrap.bundle.min.js"></script>
   <script type="module" src="js/encrypt.js"></script>

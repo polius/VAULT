@@ -1,3 +1,5 @@
+import { showToast } from './utils.js';
+
 const enc = new TextEncoder();
 
 const encFile = document.getElementById('encFile');
@@ -65,7 +67,10 @@ async function deriveKey(pw, salt, iter) {
 encBtn.onclick = async () => {
   const file = encFile.files[0];
   const pw   = encPwd.value;
-  if (!file || !pw) return alert('Choose a file and enter password.');
+  if (!file || !pw) {
+    showToast('Please select a file and enter a password');
+    return;
+  }
 
   encStatus.style.display = 'block';
   encPwd.disabled = true;
@@ -126,7 +131,8 @@ encBtn.onclick = async () => {
   encBar.classList.remove('bg-warning', 'text-dark', 'progress-bar-striped', 'progress-bar-animated');
   encBar.classList.add('bg-success', 'text-white');
   encLog.style.display = 'block';
-  encLog.textContent = '✅ File successfully encrypted.';
+  encLog.className = 'status-log success';
+  encLog.textContent = 'File successfully encrypted';
   encPwd.disabled = false;
   encBtn.disabled = false;
 };

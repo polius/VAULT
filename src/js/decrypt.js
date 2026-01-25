@@ -1,3 +1,5 @@
+import { showToast } from './utils.js';
+
 const decEnc = new TextEncoder(), decDec = new TextDecoder();
 
 const decFile = document.getElementById('decFile');
@@ -54,7 +56,7 @@ async function deriveKey(pw, salt, iter) {
 decBtn.onclick = async () => {
   const file = decFile.files[0];
   const pw   = decPwd.value;
-  if (!file || !pw) return alert('Select a .vault file and enter a password.');
+  if (!file || !pw) return showToast('Please select an encrypted file and enter the password');
 
   decStatus.style.display = 'block';
   decPwd.disabled = true;
@@ -112,10 +114,11 @@ decBtn.onclick = async () => {
     decBar.classList.remove('bg-warning', 'text-dark', 'progress-bar-striped', 'progress-bar-animated');
     decBar.classList.add('bg-success', 'text-white');
     decLog.style.display = 'block';
-    decLog.textContent = '✅ File successfully decrypted.';
+    decLog.className = 'status-log success';
+    decLog.textContent = 'File successfully decrypted';
   } catch (e) {
-    console.log(e.message);
-    decLog.textContent = '❌ Incorrect password or file is corrupted.';
+    decLog.className = 'status-log error';
+    decLog.textContent = 'Incorrect password or file is corrupted';
     decLog.style.display = 'block';
     setTimeout(() => {
       decPwd.value = '';
