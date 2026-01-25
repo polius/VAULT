@@ -617,6 +617,7 @@ body {
     right: 16px;
     left: 16px;
     transform: none;
+    align-items: stretch;
   }
   
   .app-toast {
