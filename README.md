@@ -14,7 +14,7 @@
 
 <br>
 
-![VAULT](src/images//screenshot.png)
+![VAULT](src/images/screenshot.png)
 </div>
 
 ## Installation
