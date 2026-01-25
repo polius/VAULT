@@ -14,7 +14,7 @@
 
 <br>
 
-![VAULT](src/images/screenshot.png)
+![VAULT](https://vault.alzina.dev/assets/screenshot.png)
 </div>
 
 ## Installation
