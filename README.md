@@ -1,5 +1,5 @@
 <div align="center">
-<img src="src/images/logo.svg" alt="VAULT Logo" width="45">
+<img src="src/assets/logo.svg" alt="VAULT Logo" width="45">
 <h1 align="center">VAULT</h1>
 
 **Securely <span style="color: #0d6dfd">encrypt</span> and <span style="color: #198754">decrypt</span> your files directly in your browser**
