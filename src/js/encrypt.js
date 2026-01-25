@@ -1,4 +1,4 @@
-import { showToast } from './utils.js';
+import { showToast, displayFileInfo, updatePasswordStrength, setupDragAndDrop } from './utils.js';
 
 const enc = new TextEncoder();
 
@@ -11,6 +11,17 @@ const encBtn = document.getElementById('encBtn');
 const encBar = document.getElementById('encBar');
 const encStatus = document.getElementById('encStatus');
 const encLog = document.getElementById('encLog');
+
+// Password strength indicator
+encPwd.addEventListener('input', () => {
+  updatePasswordStrength(encPwd.value, 'encPwdStrength');
+});
+
+// File info display
+encFile.addEventListener('change', () => {
+  displayFileInfo(encFile.files[0], 'encFileInfo');
+  encPwd.focus();
+});
 
 encPwd.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
@@ -30,6 +41,8 @@ encPwdGenerate.addEventListener('click', () => {
   encPwd.value = newPw;
   encPwd.focus();
   navigator.clipboard.writeText(newPw);
+  showToast('Password generated and copied to clipboard');
+  updatePasswordStrength(newPw, 'encPwdStrength');
 });
 
 encPwdToggle.addEventListener('click', () => {
@@ -44,9 +57,8 @@ encPwdToggle.addEventListener('click', () => {
   }
 });
 
-encFile.onchange = () => {
-  encPwd.focus();
-}
+// Setup drag & drop
+setupDragAndDrop(encFile, 'encFileInfo');
 
 async function deriveKey(pw, salt, iter) {
   const base = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveKey']);
@@ -72,14 +84,22 @@ encBtn.onclick = async () => {
     return;
   }
 
+  // Reset UI
+  const encCard = document.getElementById('encCard');
+  encCard.classList.add('processing');
   encStatus.style.display = 'block';
+  encLog.style.display = 'none';
+  encBar.style.width = '0%';
+  encBar.textContent = '0%';
+  encBar.className = 'progress-bar bg-warning text-dark progress-bar-striped progress-bar-animated';
   encPwd.disabled = true;
   encBtn.disabled = true;
 
-  const CHUNK = 1_048_576; // 1 MiB
-  const salt  = crypto.getRandomValues(new Uint8Array(16));
-  const iter  = 250_000;
-  const key   = await deriveKey(pw, salt, iter);
+  try {
+    const CHUNK = 1_048_576; // 1 MiB
+    const salt  = crypto.getRandomValues(new Uint8Array(16));
+    const iter  = 250_000;
+    const key   = await deriveKey(pw, salt, iter);
 
   const meta = {
     filename : file.name,
@@ -118,21 +138,40 @@ encBtn.onclick = async () => {
     encBar.textContent = pct + '%';
   }
 
-  // Finalize
-  const finalBlob = new Blob(chunks, { type: 'application/octet-stream' });
-  const url = URL.createObjectURL(finalBlob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = file.name + '.vault';
-  a.click();
-  URL.revokeObjectURL(url);
+    // Finalize
+    const finalBlob = new Blob(chunks, { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(finalBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name + '.vault';
+    a.click();
+    URL.revokeObjectURL(url);
 
-  // UI reset
-  encBar.classList.remove('bg-warning', 'text-dark', 'progress-bar-striped', 'progress-bar-animated');
-  encBar.classList.add('bg-success', 'text-white');
-  encLog.style.display = 'block';
-  encLog.className = 'status-log success';
-  encLog.textContent = 'File successfully encrypted';
-  encPwd.disabled = false;
-  encBtn.disabled = false;
+    // UI reset
+    encBar.classList.remove('bg-warning', 'text-dark', 'progress-bar-striped', 'progress-bar-animated');
+    encBar.classList.add('bg-success', 'text-white');
+    encLog.style.display = 'block';
+    encLog.className = 'status-log success';
+    const icon = encLog.querySelector('.success-icon');
+    const message = encLog.querySelector('.status-message');
+    icon.style.display = 'inline-block';
+    message.textContent = 'File successfully encrypted';
+    
+    // Clear inputs
+    encFile.value = '';
+    encPwd.value = '';
+    document.getElementById('encFileInfo').style.display = 'none';
+    document.getElementById('encPwdStrength').style.display = 'none';
+  } catch (e) {
+    encLog.className = 'status-log error';
+    const icon = encLog.querySelector('.success-icon');
+    const message = encLog.querySelector('.status-message');
+    icon.style.display = 'none';
+    message.textContent = 'Encryption failed: ' + e.message;
+    encLog.style.display = 'block';
+  } finally {
+    encCard.classList.remove('processing');
+    encPwd.disabled = false;
+    encBtn.disabled = false;
+  }
 };

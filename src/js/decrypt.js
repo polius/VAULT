@@ -1,4 +1,4 @@
-import { showToast } from './utils.js';
+import { showToast, displayFileInfo, setupDragAndDrop } from './utils.js';
 
 const decEnc = new TextEncoder(), decDec = new TextDecoder();
 
@@ -11,6 +11,12 @@ const decBtn = document.getElementById('decBtn');
 const decBar = document.getElementById('decBar');
 const decStatus = document.getElementById('decStatus');
 const decLog = document.getElementById('decLog');
+
+// File info display
+decFile.addEventListener('change', () => {
+  displayFileInfo(decFile.files[0], 'decFileInfo');
+  decPwd.focus();
+});
 
 decPwd.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
@@ -31,9 +37,8 @@ decPwdToggle.addEventListener('click', () => {
   }
 });
 
-decFile.onchange = () => {
-  decPwd.focus();
-}
+// Setup drag & drop
+setupDragAndDrop(decFile, 'decFileInfo');
 
 function b64u8(b) { return Uint8Array.from(atob(b), c => c.charCodeAt(0)) }
 
@@ -58,7 +63,14 @@ decBtn.onclick = async () => {
   const pw   = decPwd.value;
   if (!file || !pw) return showToast('Please select an encrypted file and enter the password');
 
+  // Reset UI
+  const decCard = document.getElementById('decCard');
+  decCard.classList.add('processing');
   decStatus.style.display = 'block';
+  decLog.style.display = 'none';
+  decBar.style.width = '0%';
+  decBar.textContent = '0%';
+  decBar.className = 'progress-bar bg-warning text-dark progress-bar-striped progress-bar-animated';
   decPwd.disabled = true;
   decBtn.disabled = true;
 
@@ -115,16 +127,28 @@ decBtn.onclick = async () => {
     decBar.classList.add('bg-success', 'text-white');
     decLog.style.display = 'block';
     decLog.className = 'status-log success';
-    decLog.textContent = 'File successfully decrypted';
+    const icon = decLog.querySelector('.success-icon');
+    const message = decLog.querySelector('.status-message');
+    icon.style.display = 'inline-block';
+    message.textContent = 'File successfully decrypted';
+    
+    // Clear inputs
+    decFile.value = '';
+    decPwd.value = '';
+    document.getElementById('decFileInfo').style.display = 'none';
   } catch (e) {
     decLog.className = 'status-log error';
-    decLog.textContent = 'Incorrect password or file is corrupted';
+    const icon = decLog.querySelector('.success-icon');
+    const message = decLog.querySelector('.status-message');
+    icon.style.display = 'none';
+    message.textContent = 'Incorrect password or file is corrupted';
     decLog.style.display = 'block';
     setTimeout(() => {
       decPwd.value = '';
       decPwd.focus();
     }, 100);
   } finally {
+    decCard.classList.remove('processing');
     decPwd.disabled = false;
     decBtn.disabled = false;
   }

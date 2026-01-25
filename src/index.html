@@ -20,7 +20,7 @@
           <div class="header-icon">
             <img src="images/logo.svg" alt="VAULT" />
           </div>
-          <h1 class="app-title">VAULT<span class="app-version">v.1.1.0</span></h1>
+          <h1 class="app-title">VAULT<span class="app-version">v.1.2.0</span></h1>
         </a>
       </div>
       <p class="app-subtitle">AES-GCM + PBKDF2/SHA-512</p>
@@ -29,7 +29,10 @@
 
     <div class="row gy-4">
       <div class="col-lg-6">
-        <div class="card">
+        <div class="card" id="encCard">
+          <div class="card-loading-overlay">
+            <div class="card-loading-spinner"></div>
+          </div>
           <div class="card-header">
             <i class="bi bi-shield-lock"></i>
             <h3>Encrypt</h3>
@@ -37,33 +40,46 @@
           <div class="card-body">
             <div class="form-group">
               <label for="encFile" class="form-label">File</label>
-              <input type="file" class="form-control" id="encFile" required />
+              <input type="file" class="form-control" id="encFile" aria-label="Select file to encrypt" required />
+              <div id="encFileInfo" class="file-info" style="display: none"></div>
             </div>
             <div class="form-group">
               <label for="encPwd" class="form-label">Password</label>
               <div class="input-group">
-                <input type="password" id="encPwd" class="form-control" placeholder="Enter password" autocomplete="new-password" />
-                <button class="btn btn-icon" type="button" id="encPwdGenerate" title="Generate password">
+                <input type="password" id="encPwd" class="form-control" placeholder="Enter password" autocomplete="new-password" aria-label="Encryption password" />
+                <button class="btn btn-icon" type="button" id="encPwdGenerate" title="Generate password" aria-label="Generate random password">
                   <i class="bi bi-key-fill"></i>
                 </button>
-                <button class="btn btn-icon" type="button" id="encPwdToggle" title="Toggle visibility">
+                <button class="btn btn-icon" type="button" id="encPwdToggle" title="Toggle visibility" aria-label="Toggle password visibility">
                   <i class="bi bi-eye-fill" id="encPwdToggleIcon"></i>
                 </button>
               </div>
+              <div id="encPwdStrength" class="password-strength" style="display: none">
+                <div class="strength-bar">
+                  <div class="strength-fill"></div>
+                </div>
+                <span class="strength-text"></span>
+              </div>
             </div>
-            <button id="encBtn" class="btn btn-primary">Encrypt</button>
+            <button id="encBtn" class="btn btn-primary" aria-label="Encrypt file">Encrypt</button>
             <div id="encStatus" class="status-section" style="display: none">
               <div class="progress">
                 <div id="encBar" class="progress-bar" style="width:0%">0%</div>
               </div>
-              <div id="encLog" class="status-log" style="display: none"></div>
+              <div id="encLog" class="status-log" style="display: none">
+                <i class="success-icon bi bi-check-circle-fill" style="display: none"></i>
+                <span class="status-message"></span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <div class="col-lg-6">
-        <div class="card">
+        <div class="card decrypt" id="decCard">
+          <div class="card-loading-overlay">
+            <div class="card-loading-spinner"></div>
+          </div>
           <div class="card-header decrypt">
             <i class="bi bi-shield-check"></i>
             <h3>Decrypt</h3>
@@ -71,23 +87,27 @@
           <div class="card-body">
             <div class="form-group">
               <label for="decFile" class="form-label">Encrypted File (.vault)</label>
-              <input type="file" class="form-control" id="decFile" accept=".vault" required />
+              <input type="file" class="form-control" id="decFile" accept=".vault" aria-label="Select encrypted file to decrypt" required />
+              <div id="decFileInfo" class="file-info" style="display: none"></div>
             </div>
             <div class="form-group">
               <label for="decPwd" class="form-label">Password</label>
               <div class="input-group">
-                <input type="password" id="decPwd" class="form-control" placeholder="Enter password" autocomplete="new-password" />
-                <button class="btn btn-icon" type="button" id="decPwdToggle" title="Toggle visibility">
+                <input type="password" id="decPwd" class="form-control" placeholder="Enter password" autocomplete="new-password" aria-label="Decryption password" />
+                <button class="btn btn-icon" type="button" id="decPwdToggle" title="Toggle visibility" aria-label="Toggle password visibility">
                   <i class="bi bi-eye-fill" id="decPwdToggleIcon"></i>
                 </button>
               </div>
             </div>
-            <button id="decBtn" class="btn btn-success">Decrypt</button>
+            <button id="decBtn" class="btn btn-success" aria-label="Decrypt file">Decrypt</button>
             <div id="decStatus" class="status-section" style="display: none">
               <div class="progress">
                 <div id="decBar" class="progress-bar" style="width:0%">0%</div>
               </div>
-              <div id="decLog" class="status-log" style="display: none"></div>
+              <div id="decLog" class="status-log" style="display: none">
+                <i class="success-icon bi bi-check-circle-fill" style="display: none"></i>
+                <span class="status-message"></span>
+              </div>
             </div>
           </div>
         </div>
