@@ -1,4 +1,4 @@
-import { showToast, displayFileInfo, setupDragAndDrop } from './utils.js';
+import { showToast, displayFileInfo, setupDragAndDrop, clearFileInput } from './utils.js';
 
 const decEnc = new TextEncoder(), decDec = new TextDecoder();
 
@@ -73,6 +73,7 @@ decBtn.onclick = async () => {
   decBar.className = 'progress-bar bg-warning text-dark progress-bar-striped progress-bar-animated';
   decPwd.disabled = true;
   decBtn.disabled = true;
+  decBtn.innerHTML = '<i class="bi bi-arrow-repeat spin"></i> Decrypting…';
 
   try {
     // Read entire file into memory
@@ -133,9 +134,8 @@ decBtn.onclick = async () => {
     message.textContent = 'File successfully decrypted';
     
     // Clear inputs
-    decFile.value = '';
+    clearFileInput(decFile, 'decFileInfo');
     decPwd.value = '';
-    document.getElementById('decFileInfo').style.display = 'none';
   } catch (e) {
     decLog.className = 'status-log error';
     const icon = decLog.querySelector('.success-icon');
@@ -151,5 +151,6 @@ decBtn.onclick = async () => {
     decCard.classList.remove('processing');
     decPwd.disabled = false;
     decBtn.disabled = false;
+    decBtn.innerHTML = '<i class="bi bi-unlock-fill"></i> Decrypt';
   }
 };

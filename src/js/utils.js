@@ -4,9 +4,19 @@ export function showToast(message, type = 'warning') {
     console.error('Toast container not found');
     return;
   }
+
+  const iconMap = {
+    warning: 'bi-exclamation-triangle-fill',
+    error: 'bi-x-circle-fill',
+    success: 'bi-check-circle-fill',
+  };
+
   const toast = document.createElement('div');
   toast.className = `app-toast ${type}`;
-  toast.textContent = message;
+  toast.innerHTML = `
+    <i class="bi ${iconMap[type] || iconMap.warning}"></i>
+    <span>${message}</span>
+  `;
   container.appendChild(toast);
   
   setTimeout(() => {
@@ -49,17 +59,56 @@ export function displayFileInfo(file, infoElementId) {
   const infoElement = document.getElementById(infoElementId);
   if (!infoElement) return;
   
+  const dropZone = infoElement.closest('.drop-zone');
+  const prompt = dropZone?.querySelector('.drop-zone-prompt');
+  
   if (!file) {
     infoElement.style.display = 'none';
+    infoElement.innerHTML = '';
+    if (dropZone) dropZone.classList.remove('has-file');
+    if (prompt) prompt.style.display = '';
     return;
   }
   
+  const card = dropZone?.closest('.card');
+  const isDecrypt = card?.classList.contains('decrypt');
+  const icon = isDecrypt ? 'bi-file-earmark-lock2' : 'bi-file-earmark';
+  
   infoElement.innerHTML = `
-    <i class="bi bi-file-earmark-text"></i>
+    <i class="bi ${icon}"></i>
     <span class="file-name" title="${file.name}">${file.name}</span>
     <span class="file-size">${formatFileSize(file.size)}</span>
+    <button class="file-remove" type="button" title="Remove file" aria-label="Remove file"><i class="bi bi-x-lg"></i></button>
   `;
   infoElement.style.display = 'flex';
+  if (dropZone) dropZone.classList.add('has-file');
+  if (prompt) prompt.style.display = 'none';
+  
+  const removeBtn = infoElement.querySelector('.file-remove');
+  if (removeBtn) {
+    removeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const fileInput = dropZone?.querySelector('input[type="file"]');
+      if (fileInput) fileInput.value = '';
+      infoElement.style.display = 'none';
+      infoElement.innerHTML = '';
+      if (dropZone) dropZone.classList.remove('has-file');
+      if (prompt) prompt.style.display = '';
+    });
+  }
+}
+
+export function clearFileInput(fileInput, fileInfoElementId) {
+  fileInput.value = '';
+  const infoElement = document.getElementById(fileInfoElementId);
+  if (!infoElement) return;
+  infoElement.style.display = 'none';
+  infoElement.innerHTML = '';
+  const dropZone = infoElement.closest('.drop-zone');
+  if (dropZone) dropZone.classList.remove('has-file');
+  const prompt = dropZone?.querySelector('.drop-zone-prompt');
+  if (prompt) prompt.style.display = '';
 }
 
 export function updatePasswordStrength(password, strengthElementId) {
@@ -83,7 +132,11 @@ export function updatePasswordStrength(password, strengthElementId) {
 }
 
 export function setupDragAndDrop(fileInput, fileInfoElementId) {
+  const dropZone = fileInput.closest('.drop-zone');
   const card = fileInput.closest('.card');
+  if (!card) return;
+  
+  let dragCounter = 0;
   
   function preventDefaults(e) {
     e.preventDefault();
@@ -94,26 +147,28 @@ export function setupDragAndDrop(fileInput, fileInfoElementId) {
     card.addEventListener(eventName, preventDefaults, false);
   });
   
-  ['dragenter', 'dragover'].forEach(eventName => {
-    card.addEventListener(eventName, () => {
-      card.classList.add('drag-over');
-    }, false);
-  });
+  card.addEventListener('dragenter', () => {
+    dragCounter++;
+    if (dropZone) dropZone.classList.add('drag-over');
+  }, false);
   
-  ['dragleave', 'drop'].forEach(eventName => {
-    card.addEventListener(eventName, () => {
-      card.classList.remove('drag-over');
-    }, false);
-  });
+  card.addEventListener('dragleave', () => {
+    dragCounter--;
+    if (dragCounter === 0 && dropZone) {
+      dropZone.classList.remove('drag-over');
+    }
+  }, false);
   
   card.addEventListener('drop', (e) => {
+    dragCounter = 0;
+    if (dropZone) dropZone.classList.remove('drag-over');
+    
     const dt = e.dataTransfer;
     const files = dt.files;
     
     if (files.length > 0) {
       fileInput.files = files;
       displayFileInfo(files[0], fileInfoElementId);
-      // Find and focus the password input in the same card
       const pwdInput = card.querySelector('input[type="password"], input[type="text"][id*="Pwd"]');
       if (pwdInput) pwdInput.focus();
     }

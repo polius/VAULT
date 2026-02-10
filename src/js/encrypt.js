@@ -1,4 +1,4 @@
-import { showToast, displayFileInfo, updatePasswordStrength, setupDragAndDrop } from './utils.js';
+import { showToast, displayFileInfo, updatePasswordStrength, setupDragAndDrop, clearFileInput } from './utils.js';
 
 const enc = new TextEncoder();
 
@@ -41,7 +41,7 @@ encPwdGenerate.addEventListener('click', () => {
   encPwd.value = newPw;
   encPwd.focus();
   navigator.clipboard.writeText(newPw);
-  showToast('Password generated and copied to clipboard');
+  showToast('Password generated and copied to clipboard', 'success');
   updatePasswordStrength(newPw, 'encPwdStrength');
 });
 
@@ -94,6 +94,7 @@ encBtn.onclick = async () => {
   encBar.className = 'progress-bar bg-warning text-dark progress-bar-striped progress-bar-animated';
   encPwd.disabled = true;
   encBtn.disabled = true;
+  encBtn.innerHTML = '<i class="bi bi-arrow-repeat spin"></i> Encrypting…';
 
   try {
     const CHUNK = 1_048_576; // 1 MiB
@@ -158,9 +159,8 @@ encBtn.onclick = async () => {
     message.textContent = 'File successfully encrypted';
     
     // Clear inputs
-    encFile.value = '';
+    clearFileInput(encFile, 'encFileInfo');
     encPwd.value = '';
-    document.getElementById('encFileInfo').style.display = 'none';
     document.getElementById('encPwdStrength').style.display = 'none';
   } catch (e) {
     encLog.className = 'status-log error';
@@ -173,5 +173,6 @@ encBtn.onclick = async () => {
     encCard.classList.remove('processing');
     encPwd.disabled = false;
     encBtn.disabled = false;
+    encBtn.innerHTML = '<i class="bi bi-lock-fill"></i> Encrypt';
   }
 };
