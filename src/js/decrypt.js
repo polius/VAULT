@@ -42,6 +42,32 @@ setupDragAndDrop(decFile, 'decFileInfo');
 
 function b64u8(b) { return Uint8Array.from(atob(b), c => c.charCodeAt(0)) }
 
+// Mirror of encrypt.js: header || LE32(index) || isLast byte.
+function buildAAD(header, index, isLast) {
+  const aad = new Uint8Array(header.length + 5);
+  aad.set(header, 0);
+  new DataView(aad.buffer).setUint32(header.length, index, true);
+  aad[header.length + 4] = isLast ? 1 : 0;
+  return aad;
+}
+
+// The header is attacker-controllable, so validate/clamp it before it drives key
+// derivation or buffer sizing. Unbounded iterations would otherwise hang the tab.
+const MAX_ITERATIONS = 5_000_000;
+const MAX_CHUNK = 64 * 1024 * 1024; // 64 MiB
+
+function validateMeta(meta, dataLen) {
+  if (typeof meta.salt !== 'string' || meta.salt.length === 0) throw new Error('Invalid metadata: salt');
+  if (!Number.isInteger(meta.iterations) || meta.iterations < 1 || meta.iterations > MAX_ITERATIONS)
+    throw new Error('Invalid metadata: iterations');
+  if (!Number.isInteger(meta.size) || meta.size < 0 || meta.size > dataLen)
+    throw new Error('Invalid metadata: size');
+  if (!Number.isInteger(meta.chunk) || meta.chunk < 1 || meta.chunk > MAX_CHUNK)
+    throw new Error('Invalid metadata: chunk');
+  if (typeof meta.filename !== 'string' || meta.filename.length === 0)
+    throw new Error('Invalid metadata: filename');
+}
+
 async function deriveKey(pw, salt, iter) {
   const base = await crypto.subtle.importKey('raw', decEnc.encode(pw), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
@@ -85,7 +111,7 @@ decBtn.onclick = async () => {
     if (magic !== 'AES1') throw new Error('Bad magic');
 
     const version = data[offset]; offset += 1;
-    if (version !== 1) throw new Error('Bad version');
+    if (version !== 1 && version !== 2) throw new Error('Bad version');
 
     const hdrLen = new DataView(data.buffer, offset, 4).getUint32(0, true);
     offset += 4;
@@ -93,22 +119,33 @@ decBtn.onclick = async () => {
     const metaStr = new TextDecoder().decode(data.slice(offset, offset + hdrLen));
     offset += hdrLen;
     const meta = JSON.parse(metaStr);
+    validateMeta(meta, data.length);
+
+    // Header bytes covering magic | version | metaLen | meta — authenticated as
+    // AAD in version 2 so any tampering with the metadata fails decryption.
+    const header = data.slice(0, offset);
 
     const key = await deriveKey(pw, b64u8(meta.salt), meta.iterations);
 
     // Collect decrypted chunks
     const chunks = [];
     let done = 0;
+    let index = 0;
 
     while (done < meta.size) {
       const iv = data.slice(offset, offset + 12); offset += 12;
       const chunkSize = Math.min(meta.chunk, meta.size - done);
       const ct = data.slice(offset, offset + chunkSize + 16); offset += chunkSize + 16;
 
-      const pt = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct));
+      const isLast = done + chunkSize >= meta.size;
+      const params = version === 2
+        ? { name: 'AES-GCM', iv, additionalData: buildAAD(header, index, isLast) }
+        : { name: 'AES-GCM', iv };
+      const pt = new Uint8Array(await crypto.subtle.decrypt(params, key, ct));
       chunks.push(pt);
 
       done += pt.length;
+      index++;
       const pct = ((done / meta.size) * 100).toFixed(1);
       decBar.style.width = pct + '%';
       decBar.textContent = pct + '%';
