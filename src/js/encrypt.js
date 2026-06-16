@@ -1,4 +1,4 @@
-import { showToast, displayFileInfo, updatePasswordStrength, setupDragAndDrop, clearFileInput } from './utils.js';
+import { showToast, displayFileInfo, updatePasswordStrength, setupDragAndDrop, clearFileInput, confirmLargeFile } from './utils.js';
 
 const enc = new TextEncoder();
 
@@ -102,6 +102,7 @@ encBtn.onclick = async () => {
     showToast('Please select a file and enter a password');
     return;
   }
+  if (!confirmLargeFile(file)) return;
 
   // Reset UI
   const encCard = document.getElementById('encCard');

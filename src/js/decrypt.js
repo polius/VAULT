@@ -1,4 +1,4 @@
-import { showToast, displayFileInfo, setupDragAndDrop, clearFileInput } from './utils.js';
+import { showToast, displayFileInfo, setupDragAndDrop, clearFileInput, confirmLargeFile } from './utils.js';
 
 const decEnc = new TextEncoder(), decDec = new TextDecoder();
 
@@ -88,6 +88,7 @@ decBtn.onclick = async () => {
   const file = decFile.files[0];
   const pw   = decPwd.value;
   if (!file || !pw) return showToast('Please select an encrypted file and enter the password');
+  if (!confirmLargeFile(file)) return;
 
   // Reset UI
   const decCard = document.getElementById('decCard');

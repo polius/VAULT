@@ -26,6 +26,18 @@ export function showToast(message, type = 'warning') {
   }, 3000);
 }
 
+// Both encrypt and decrypt buffer the entire file (plus a second copy) in memory,
+// so very large files can freeze or crash the tab. Warn the user before committing.
+export const LARGE_FILE_THRESHOLD = 1024 * 1024 * 1024; // 1 GiB
+
+export function confirmLargeFile(file) {
+  if (!file || file.size <= LARGE_FILE_THRESHOLD) return true;
+  return window.confirm(
+    `This file is large (${formatFileSize(file.size)}). Processing happens entirely ` +
+    `in your browser's memory and may freeze or crash the tab. Continue?`
+  );
+}
+
 export function calculatePasswordStrength(password) {
   if (!password) return null;
   
