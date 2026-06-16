@@ -40,9 +40,10 @@ encPwdGenerate.addEventListener('click', () => {
   const newPw = generateRandomAESKeyBase64();
   encPwd.value = newPw;
   encPwd.focus();
-  navigator.clipboard.writeText(newPw);
-  showToast('Password generated and copied to clipboard', 'success');
   updatePasswordStrength(newPw, 'encPwdStrength');
+  navigator.clipboard.writeText(newPw)
+    .then(() => showToast('Password generated and copied to clipboard', 'success'))
+    .catch(() => showToast('Password generated (clipboard copy failed — copy it manually)', 'warning'));
 });
 
 encPwdToggle.addEventListener('click', () => {
