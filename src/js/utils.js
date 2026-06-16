@@ -13,16 +13,29 @@ export function showToast(message, type = 'warning') {
 
   const toast = document.createElement('div');
   toast.className = `app-toast ${type}`;
-  toast.innerHTML = `
-    <i class="bi ${iconMap[type] || iconMap.warning}"></i>
-    <span>${message}</span>
-  `;
+  const toastIcon = document.createElement('i');
+  toastIcon.className = `bi ${iconMap[type] || iconMap.warning}`;
+  const toastText = document.createElement('span');
+  toastText.textContent = message;
+  toast.append(toastIcon, toastText);
   container.appendChild(toast);
   
   setTimeout(() => {
     toast.style.animation = 'slideOut 0.3s ease';
     setTimeout(() => toast.remove(), 300);
   }, 3000);
+}
+
+// Both encrypt and decrypt buffer the entire file (plus a second copy) in memory,
+// so very large files can freeze or crash the tab. Warn the user before committing.
+export const LARGE_FILE_THRESHOLD = 1024 * 1024 * 1024; // 1 GiB
+
+export function confirmLargeFile(file) {
+  if (!file || file.size <= LARGE_FILE_THRESHOLD) return true;
+  return window.confirm(
+    `This file is large (${formatFileSize(file.size)}). Processing happens entirely ` +
+    `in your browser's memory and may freeze or crash the tab. Continue?`
+  );
 }
 
 export function calculatePasswordStrength(password) {
@@ -73,30 +86,48 @@ export function displayFileInfo(file, infoElementId) {
   const card = dropZone?.closest('.card');
   const isDecrypt = card?.classList.contains('decrypt');
   const icon = isDecrypt ? 'bi-file-earmark-lock2' : 'bi-file-earmark';
-  
-  infoElement.innerHTML = `
-    <i class="bi ${icon}"></i>
-    <span class="file-name" title="${file.name}">${file.name}</span>
-    <span class="file-size">${formatFileSize(file.size)}</span>
-    <button class="file-remove" type="button" title="Remove file" aria-label="Remove file"><i class="bi bi-x-lg"></i></button>
-  `;
+
+  // Build the file-info node via the DOM API. file.name is attacker-controllable
+  // (it comes from the OS filename of a dropped/selected file), so it must never
+  // be interpolated into innerHTML — use textContent/setAttribute instead.
+  infoElement.replaceChildren();
+
+  const fileIcon = document.createElement('i');
+  fileIcon.className = `bi ${icon}`;
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'file-name';
+  nameEl.title = file.name;
+  nameEl.textContent = file.name;
+
+  const sizeEl = document.createElement('span');
+  sizeEl.className = 'file-size';
+  sizeEl.textContent = formatFileSize(file.size);
+
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'file-remove';
+  removeBtn.type = 'button';
+  removeBtn.title = 'Remove file';
+  removeBtn.setAttribute('aria-label', 'Remove file');
+  const removeIcon = document.createElement('i');
+  removeIcon.className = 'bi bi-x-lg';
+  removeBtn.appendChild(removeIcon);
+
+  infoElement.append(fileIcon, nameEl, sizeEl, removeBtn);
   infoElement.style.display = 'flex';
   if (dropZone) dropZone.classList.add('has-file');
   if (prompt) prompt.style.display = 'none';
   
-  const removeBtn = infoElement.querySelector('.file-remove');
-  if (removeBtn) {
-    removeBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const fileInput = dropZone?.querySelector('input[type="file"]');
-      if (fileInput) fileInput.value = '';
-      infoElement.style.display = 'none';
-      infoElement.innerHTML = '';
-      if (dropZone) dropZone.classList.remove('has-file');
-      if (prompt) prompt.style.display = '';
-    });
-  }
+  removeBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const fileInput = dropZone?.querySelector('input[type="file"]');
+    if (fileInput) fileInput.value = '';
+    infoElement.style.display = 'none';
+    infoElement.replaceChildren();
+    if (dropZone) dropZone.classList.remove('has-file');
+    if (prompt) prompt.style.display = '';
+  });
 }
 
 export function clearFileInput(fileInput, fileInfoElementId) {

@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # Keep the GitHub Actions used by the release workflow up to date.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # Keep the nginx base image in the Dockerfile up to date.
+  # NOTE: Dependabot can only bump a versioned tag. A floating tag such as
+  # "nginx:alpine" has no version to compare, so pin it (e.g. "nginx:1.27-alpine"
+  # or a digest) for Dependabot to open update PRs.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    groups:
+      docker:
+        patterns:
+          - "*"

@@ -1,4 +1,4 @@
-import { showToast, displayFileInfo, updatePasswordStrength, setupDragAndDrop, clearFileInput } from './utils.js';
+import { showToast, displayFileInfo, updatePasswordStrength, setupDragAndDrop, clearFileInput, confirmLargeFile } from './utils.js';
 
 const enc = new TextEncoder();
 
@@ -40,9 +40,10 @@ encPwdGenerate.addEventListener('click', () => {
   const newPw = generateRandomAESKeyBase64();
   encPwd.value = newPw;
   encPwd.focus();
-  navigator.clipboard.writeText(newPw);
-  showToast('Password generated and copied to clipboard', 'success');
   updatePasswordStrength(newPw, 'encPwdStrength');
+  navigator.clipboard.writeText(newPw)
+    .then(() => showToast('Password generated and copied to clipboard', 'success'))
+    .catch(() => showToast('Password generated (clipboard copy failed — copy it manually)', 'warning'));
 });
 
 encPwdToggle.addEventListener('click', () => {
@@ -59,6 +60,25 @@ encPwdToggle.addEventListener('click', () => {
 
 // Setup drag & drop
 setupDragAndDrop(encFile, 'encFileInfo');
+
+function concatBytes(...arrays) {
+  const total = arrays.reduce((n, a) => n + a.length, 0);
+  const out = new Uint8Array(total);
+  let pos = 0;
+  for (const a of arrays) { out.set(a, pos); pos += a.length; }
+  return out;
+}
+
+// Per-chunk Additional Authenticated Data. Binding the full header, the chunk
+// index and an "is last chunk" flag into the GCM tag makes the metadata
+// tamper-evident and prevents chunk reordering, duplication and truncation.
+function buildAAD(header, index, isLast) {
+  const aad = new Uint8Array(header.length + 5);
+  aad.set(header, 0);
+  new DataView(aad.buffer).setUint32(header.length, index, true);
+  aad[header.length + 4] = isLast ? 1 : 0;
+  return aad;
+}
 
 async function deriveKey(pw, salt, iter) {
   const base = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveKey']);
@@ -83,6 +103,7 @@ encBtn.onclick = async () => {
     showToast('Please select a file and enter a password');
     return;
   }
+  if (!confirmLargeFile(file)) return;
 
   // Reset UI
   const encCard = document.getElementById('encCard');
@@ -99,7 +120,7 @@ encBtn.onclick = async () => {
   try {
     const CHUNK = 1_048_576; // 1 MiB
     const salt  = crypto.getRandomValues(new Uint8Array(16));
-    const iter  = 250_000;
+    const iter  = 600_000;
     const key   = await deriveKey(pw, salt, iter);
 
   const meta = {
@@ -113,27 +134,30 @@ encBtn.onclick = async () => {
   };
 
   const metaBytes = enc.encode(JSON.stringify(meta));
-  const chunks = [];
 
-  // Header
-  chunks.push(enc.encode('AES1'));  // magic
-  chunks.push(new Uint8Array([1])); // version
+  // Header: magic(4) | version(1) | metaLen(4, LE) | meta. Version 2 binds the
+  // header + chunk index + last-flag into each chunk's GCM tag (see buildAAD).
   const lenBuf = new Uint8Array(4);
   new DataView(lenBuf.buffer).setUint32(0, metaBytes.length, true);
-  chunks.push(lenBuf);
-  chunks.push(metaBytes);
+  const header = concatBytes(enc.encode('AES1'), new Uint8Array([2]), lenBuf, metaBytes);
+
+  const chunks = [header];
 
   // File, chunk-by-chunk
   let offset = 0;
+  let index = 0;
   while (offset < file.size) {
     const blob  = file.slice(offset, offset + CHUNK);
     const chunk = new Uint8Array(await blob.arrayBuffer());
+    const isLast = offset + chunk.length >= file.size;
     const iv    = crypto.getRandomValues(new Uint8Array(12));
-    const ct    = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, chunk));
+    const ct    = new Uint8Array(await crypto.subtle.encrypt(
+      { name:'AES-GCM', iv, additionalData: buildAAD(header, index, isLast) }, key, chunk));
     chunks.push(iv);
     chunks.push(ct);
 
     offset += chunk.length;
+    index++;
     const pct = ((offset / file.size) * 100).toFixed(1);
     encBar.style.width = pct + '%';
     encBar.textContent = pct + '%';
