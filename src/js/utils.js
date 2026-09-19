@@ -26,15 +26,15 @@ export function showToast(message, type = 'warning') {
   }, 3000);
 }
 
-// Both encrypt and decrypt buffer the entire file (plus a second copy) in memory,
-// so very large files can freeze or crash the tab. Warn the user before committing.
-export const LARGE_FILE_THRESHOLD = 1024 * 1024 * 1024; // 1 GiB
+// Output streams to disk (fs/sw sinks), but the blob fallback and the browser's
+// own download pipeline can still use significant memory on very large files.
+export const LARGE_FILE_THRESHOLD = 500 * 1024 * 1024; // 500 MB
 
 export function confirmLargeFile(file) {
   if (!file || file.size <= LARGE_FILE_THRESHOLD) return true;
   return window.confirm(
-    `This file is large (${formatFileSize(file.size)}). Processing happens entirely ` +
-    `in your browser's memory and may freeze or crash the tab. Continue?`
+    `This file is large (${formatFileSize(file.size)}). Depending on your browser, ` +
+    `processing may use significant memory. Continue?`
   );
 }
 
@@ -63,8 +63,9 @@ export function calculatePasswordStrength(password) {
 export function formatFileSize(bytes) {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  // Clamp so exotic inputs (or float rounding) can never index past the array.
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 }
 

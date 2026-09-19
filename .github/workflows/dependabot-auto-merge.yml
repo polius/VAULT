@@ -1,7 +1,7 @@
 name: Dependabot auto-merge
 
-# Automatically approve and merge every Dependabot pull request — including
-# major version bumps. Requires two repository settings to be enabled:
+# Automatically approve and merge Dependabot pull requests, excluding major
+# version bumps (those need human review). Requires two repository settings:
 #   1. Settings → General → Pull Requests → "Allow auto-merge"
 #   2. Settings → Actions → General → Workflow permissions →
 #      "Allow GitHub Actions to create and approve pull requests"
@@ -23,14 +23,11 @@ jobs:
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Approve the pull request
-        run: gh pr review --approve "$PR_URL"
-        env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Enable auto-merge (all updates, including majors)
-        run: gh pr merge --auto --squash "$PR_URL"
+      - name: Approve and enable auto-merge (minor/patch only)
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        run: |
+          gh pr review --approve "$PR_URL"
+          gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

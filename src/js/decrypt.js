@@ -1,16 +1,20 @@
 import { showToast, displayFileInfo, setupDragAndDrop, clearFileInput, confirmLargeFile } from './utils.js';
+import { b64u8, buildAAD, deriveKey, concatBytes } from './crypto-common.js';
+import { openSink, registerServiceWorker } from './sink.js';
 
-const decEnc = new TextEncoder(), decDec = new TextDecoder();
+const decDec = new TextDecoder();
 
 const decFile = document.getElementById('decFile');
 const decPwd = document.getElementById('decPwd');
-const decPwdGenerate = document.getElementById('decPwdGenerate');
 const decPwdToggle = document.getElementById('decPwdToggle');
 const decPwdToggleIcon = document.getElementById('decPwdToggleIcon');
 const decBtn = document.getElementById('decBtn');
+const decCancel = document.getElementById('decCancel');
 const decBar = document.getElementById('decBar');
 const decStatus = document.getElementById('decStatus');
 const decLog = document.getElementById('decLog');
+
+registerServiceWorker();
 
 // File info display
 decFile.addEventListener('change', () => {
@@ -40,21 +44,12 @@ decPwdToggle.addEventListener('click', () => {
 // Setup drag & drop
 setupDragAndDrop(decFile, 'decFileInfo');
 
-function b64u8(b) { return Uint8Array.from(atob(b), c => c.charCodeAt(0)) }
-
-// Mirror of encrypt.js: header || LE32(index) || isLast byte.
-function buildAAD(header, index, isLast) {
-  const aad = new Uint8Array(header.length + 5);
-  aad.set(header, 0);
-  new DataView(aad.buffer).setUint32(header.length, index, true);
-  aad[header.length + 4] = isLast ? 1 : 0;
-  return aad;
-}
-
 // The header is attacker-controllable, so validate/clamp it before it drives key
 // derivation or buffer sizing. Unbounded iterations would otherwise hang the tab.
 const MAX_ITERATIONS = 5_000_000;
 const MAX_CHUNK = 64 * 1024 * 1024; // 64 MiB
+const MIN_CHUNK = 4096; // every released version wrote 1 MiB, so a floor is safe
+const MAX_META = 4096;
 
 function validateMeta(meta, dataLen) {
   if (typeof meta.salt !== 'string' || meta.salt.length === 0) throw new Error('Invalid metadata: salt');
@@ -62,27 +57,16 @@ function validateMeta(meta, dataLen) {
     throw new Error('Invalid metadata: iterations');
   if (!Number.isInteger(meta.size) || meta.size < 0 || meta.size > dataLen)
     throw new Error('Invalid metadata: size');
-  if (!Number.isInteger(meta.chunk) || meta.chunk < 1 || meta.chunk > MAX_CHUNK)
+  if (!Number.isInteger(meta.chunk) || meta.chunk < MIN_CHUNK || meta.chunk > MAX_CHUNK)
     throw new Error('Invalid metadata: chunk');
   if (typeof meta.filename !== 'string' || meta.filename.length === 0)
     throw new Error('Invalid metadata: filename');
+  if (meta.kdf !== undefined && meta.kdf !== 'PBKDF2') throw new Error('Invalid metadata: kdf');
+  if (meta.hash !== undefined && meta.hash !== 'SHA-512') throw new Error('Invalid metadata: hash');
 }
 
-async function deriveKey(pw, salt, iter) {
-  const base = await crypto.subtle.importKey('raw', decEnc.encode(pw), 'PBKDF2', false, ['deriveKey']);
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt,
-      iterations: iter,
-      hash: 'SHA-512'
-    },
-    base,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['decrypt']
-  );
-}
+let cancelRequested = false;
+decCancel.addEventListener('click', () => { cancelRequested = true; });
 
 decBtn.onclick = async () => {
   const file = decFile.files[0];
@@ -91,6 +75,7 @@ decBtn.onclick = async () => {
   if (!confirmLargeFile(file)) return;
 
   // Reset UI
+  cancelRequested = false;
   const decCard = document.getElementById('decCard');
   decCard.classList.add('processing');
   decStatus.style.display = 'block';
@@ -98,52 +83,55 @@ decBtn.onclick = async () => {
   decBar.style.width = '0%';
   decBar.textContent = '0%';
   decBar.className = 'progress-bar bg-warning text-dark progress-bar-striped progress-bar-animated';
+  decCancel.style.display = '';
   decPwd.disabled = true;
   decBtn.disabled = true;
   decBtn.innerHTML = '<i class="bi bi-arrow-repeat spin"></i> Decrypting…';
 
+  let sink = null;
   try {
-    // Read entire file into memory
-    const data = new Uint8Array(await file.arrayBuffer());
-    let offset = 0;
+    // Read only the header incrementally — never buffer the whole ciphertext.
+    const head = new Uint8Array(await file.slice(0, 9).arrayBuffer());
+    if (head.length < 9 || decDec.decode(head.slice(0, 4)) !== 'AES1') throw new Error('Bad magic');
 
-    // Header
-    const magic = new TextDecoder().decode(data.slice(offset, offset + 4)); offset += 4;
-    if (magic !== 'AES1') throw new Error('Bad magic');
-
-    const version = data[offset]; offset += 1;
+    const version = head[4];
     if (version !== 1 && version !== 2) throw new Error('Bad version');
 
-    const hdrLen = new DataView(data.buffer, offset, 4).getUint32(0, true);
-    offset += 4;
+    const metaLen = new DataView(head.buffer, 5, 4).getUint32(0, true);
+    if (metaLen > MAX_META || 9 + metaLen > file.size) throw new Error('Bad header');
 
-    const metaStr = new TextDecoder().decode(data.slice(offset, offset + hdrLen));
-    offset += hdrLen;
-    const meta = JSON.parse(metaStr);
-    validateMeta(meta, data.length);
+    const metaBytes = new Uint8Array(await file.slice(9, 9 + metaLen).arrayBuffer());
+    const meta = JSON.parse(decDec.decode(metaBytes));
+    validateMeta(meta, file.size);
 
     // Header bytes covering magic | version | metaLen | meta — authenticated as
     // AAD in version 2 so any tampering with the metadata fails decryption.
-    const header = data.slice(0, offset);
+    const header = concatBytes(head, metaBytes);
 
-    const key = await deriveKey(pw, b64u8(meta.salt), meta.iterations);
+    // Open the output before deriving the key so the fs save picker appears early.
+    sink = await openSink({ id: crypto.randomUUID(), name: meta.filename, size: meta.size, mime: 'application/octet-stream' });
 
-    // Collect decrypted chunks
-    const chunks = [];
+    const key = await deriveKey(pw, b64u8(meta.salt), meta.iterations, 'decrypt');
+
+    // Stream: each Blob.slice().arrayBuffer() reads only that block from the
+    // OS-backed file, so peak memory stays at one chunk of plaintext.
+    let offset = 9 + metaLen;
     let done = 0;
     let index = 0;
 
     while (done < meta.size) {
-      const iv = data.slice(offset, offset + 12); offset += 12;
+      if (cancelRequested) throw new DOMException('Cancelled', 'AbortError');
+      const iv = new Uint8Array(await file.slice(offset, offset + 12).arrayBuffer());
       const chunkSize = Math.min(meta.chunk, meta.size - done);
-      const ct = data.slice(offset, offset + chunkSize + 16); offset += chunkSize + 16;
+      const ct = new Uint8Array(await file.slice(offset + 12, offset + 12 + chunkSize + 16).arrayBuffer());
+      offset += 12 + chunkSize + 16;
 
       const isLast = done + chunkSize >= meta.size;
       const params = version === 2
         ? { name: 'AES-GCM', iv, additionalData: buildAAD(header, index, isLast) }
         : { name: 'AES-GCM', iv };
       const pt = new Uint8Array(await crypto.subtle.decrypt(params, key, ct));
-      chunks.push(pt);
+      await sink.write(pt);
 
       done += pt.length;
       index++;
@@ -152,14 +140,8 @@ decBtn.onclick = async () => {
       decBar.textContent = pct + '%';
     }
 
-    // Build final Blob and trigger download
-    const finalBlob = new Blob(chunks, { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(finalBlob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = meta.filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    await sink.close();
+    sink = null;
 
     // UI update
     decBar.classList.remove('bg-warning', 'text-dark', 'progress-bar-striped', 'progress-bar-animated');
@@ -170,23 +152,29 @@ decBtn.onclick = async () => {
     const message = decLog.querySelector('.status-message');
     icon.style.display = 'inline-block';
     message.textContent = 'File successfully decrypted';
-    
+
     // Clear inputs
     clearFileInput(decFile, 'decFileInfo');
     decPwd.value = '';
   } catch (e) {
+    // Keep the user-facing message generic; log details to the console for debugging.
+    console.error('Decryption failed:', e);
+    if (sink) { try { await sink.abort(); } catch {} }
     decLog.className = 'status-log error';
     const icon = decLog.querySelector('.success-icon');
     const message = decLog.querySelector('.status-message');
     icon.style.display = 'none';
-    message.textContent = 'Incorrect password or file is corrupted';
+    message.textContent = e.name === 'AbortError' ? 'Operation cancelled' : 'Incorrect password or file is corrupted';
     decLog.style.display = 'block';
-    setTimeout(() => {
-      decPwd.value = '';
-      decPwd.focus();
-    }, 100);
+    if (e.name !== 'AbortError') {
+      setTimeout(() => {
+        decPwd.value = '';
+        decPwd.focus();
+      }, 100);
+    }
   } finally {
     decCard.classList.remove('processing');
+    decCancel.style.display = 'none';
     decPwd.disabled = false;
     decBtn.disabled = false;
     decBtn.innerHTML = '<i class="bi bi-unlock-fill"></i> Decrypt';

@@ -1,0 +1,8 @@
+{
+  "name": "vault-e2e",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "playwright": "^1.55.0"
+  }
+}

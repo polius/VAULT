@@ -1,0 +1,56 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Node tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run test suite
+        run: npm test
+
+  # End-to-end smoke: real Chromium against the real container. Round-trips a
+  # random file through encrypt -> decrypt via each sink (sw, fs, blob) and
+  # verifies SHA-256 equality.
+  e2e-smoke:
+    name: E2E smoke (chromium, sw/fs/blob)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+
+      - name: Build image and start container
+        run: |
+          docker build -t vault:e2e .
+          docker run -d --name vault-e2e -p 127.0.0.1:8080:80 vault:e2e
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run e2e cells
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          node run.mjs --base-url=http://127.0.0.1:8080 --size=16M
+
+      - name: Teardown
+        if: always()
+        run: docker rm -f vault-e2e
