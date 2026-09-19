@@ -14,7 +14,7 @@
 
 <br>
 
-![VAULT](https://vault.alzina.dev/assets/screenshot.png?v=1.4.0)
+![VAULT](https://vault.alzina.dev/assets/screenshot.png?v=1.5.0)
 </div>
 
 ## Installation
@@ -63,3 +63,11 @@ Once deployed, open your web browser and visit:
 
 - **HTTP**: http://localhost/
 - **HTTPS**: https://yourdomain.com (if configured)
+
+## Development
+
+Run the test suite (requires Node 22+):
+
+```bash
+npm test
+```
