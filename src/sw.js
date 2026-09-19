@@ -35,7 +35,9 @@ self.addEventListener('message', (event) => {
     }
     if (data && data.type === 'end') {
       try { controller.close(); } catch {}
+      try { port.close(); } catch {}
       transfers.delete(id);
+      return;
     }
   };
 
