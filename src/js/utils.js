@@ -26,15 +26,15 @@ export function showToast(message, type = 'warning') {
   }, 3000);
 }
 
-// Both encrypt and decrypt buffer the entire file (plus a second copy) in memory,
-// so very large files can freeze or crash the tab. Warn the user before committing.
+// Output streams to disk (fs/sw sinks), but the blob fallback and the browser's
+// own download pipeline can still use significant memory on very large files.
 export const LARGE_FILE_THRESHOLD = 500 * 1024 * 1024; // 500 MB
 
 export function confirmLargeFile(file) {
   if (!file || file.size <= LARGE_FILE_THRESHOLD) return true;
   return window.confirm(
-    `This file is large (${formatFileSize(file.size)}). Processing happens entirely ` +
-    `in your browser's memory and may freeze or crash the tab. Continue?`
+    `This file is large (${formatFileSize(file.size)}). Depending on your browser, ` +
+    `processing may use significant memory. Continue?`
   );
 }
 

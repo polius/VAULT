@@ -419,6 +419,21 @@ body {
   margin-right: 6px;
 }
 
+.btn-cancel {
+  width: auto;
+  padding: 6px 16px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #ef4444;
+  margin-bottom: 12px;
+}
+
+.btn-cancel:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+}
+
 /* ===== Progress ===== */
 .status-section {
   margin-top: 28px;

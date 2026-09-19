@@ -29,9 +29,10 @@ function makeEl(id) {
 const els = {};
 const created = [];
 export const blobStore = new Map();
-const getEl = (id) => (els[id] ||= makeEl(id));
+export const getEl = (id) => (els[id] ||= makeEl(id));
 
 globalThis.document = {
+  body: makeEl('body'),
   getElementById: getEl,
   createElement: (tag) => { const e = makeEl('created-' + tag); created.push(e); return e; },
   querySelector: () => makeEl('qs'),
