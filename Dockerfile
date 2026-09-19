@@ -17,5 +17,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Expose port 80 for HTTP traffic
 EXPOSE 80
 
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1
+
 # Start Nginx in the foreground (required for Docker)
 CMD ["nginx", "-g", "daemon off;"]
