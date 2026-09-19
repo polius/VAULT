@@ -84,7 +84,9 @@ export async function registerServiceWorker() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
   if (!window.isSecureContext) return;
   try {
-    const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    // updateViaCache:'none' — SW update checks must never be served from the
+    // HTTP cache, or a deployed worker fix can stay invisible for hours.
+    const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' });
     sinkState.serviceWorkerRegistration = reg;
     if (reg.active) {
       sinkState.serviceWorkerReady = true;

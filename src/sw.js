@@ -2,6 +2,12 @@
 // Page registers a transfer via `{ type: 'register', id, name, size, mime, port }`,
 // then navigates to /__download/{id}; this SW serves a Response fed by the port.
 // Port messages: ArrayBuffer/Uint8Array -> chunk, { type: 'end' } -> close.
+//
+// The transfer entry deliberately stays in the map after 'end': in Firefox the
+// iframe navigation can reach the fetch handler AFTER the page has finished
+// streaming (fast drain of small staged files), so deleting on 'end' would 404
+// a download whose bytes are already fully buffered in the closed stream. The
+// fetch handler guards re-serving with `served`; the GC reclaims old entries.
 
 const transfers = new Map();
 
@@ -36,7 +42,6 @@ self.addEventListener('message', (event) => {
     if (data && data.type === 'end') {
       try { controller.close(); } catch {}
       try { port.close(); } catch {}
-      transfers.delete(id);
       return;
     }
   };
@@ -51,10 +56,11 @@ self.addEventListener('fetch', (event) => {
   if (!match) return;
 
   const entry = transfers.get(match[1]);
-  if (!entry) {
+  if (!entry || entry.served) {
     event.respondWith(new Response('Transfer not found or expired.', { status: 404 }));
     return;
   }
+  entry.served = true;
 
   const headers = new Headers({
     'Content-Type': entry.mime,
@@ -69,7 +75,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(new Response(entry.stream, { headers }));
 });
 
-// GC transfers that registered but were never fetched.
+// GC transfers that were never fetched, or whose download has long finished.
 setInterval(() => {
   const now = Date.now();
   for (const [id, entry] of transfers) {
