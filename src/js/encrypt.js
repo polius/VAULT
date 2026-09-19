@@ -1,4 +1,5 @@
 import { showToast, displayFileInfo, updatePasswordStrength, setupDragAndDrop, clearFileInput, confirmLargeFile } from './utils.js';
+import { concatBytes, buildAAD, deriveKey } from './crypto-common.js';
 
 const enc = new TextEncoder();
 
@@ -61,41 +62,6 @@ encPwdToggle.addEventListener('click', () => {
 // Setup drag & drop
 setupDragAndDrop(encFile, 'encFileInfo');
 
-function concatBytes(...arrays) {
-  const total = arrays.reduce((n, a) => n + a.length, 0);
-  const out = new Uint8Array(total);
-  let pos = 0;
-  for (const a of arrays) { out.set(a, pos); pos += a.length; }
-  return out;
-}
-
-// Per-chunk Additional Authenticated Data. Binding the full header, the chunk
-// index and an "is last chunk" flag into the GCM tag makes the metadata
-// tamper-evident and prevents chunk reordering, duplication and truncation.
-function buildAAD(header, index, isLast) {
-  const aad = new Uint8Array(header.length + 5);
-  aad.set(header, 0);
-  new DataView(aad.buffer).setUint32(header.length, index, true);
-  aad[header.length + 4] = isLast ? 1 : 0;
-  return aad;
-}
-
-async function deriveKey(pw, salt, iter) {
-  const base = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveKey']);
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt,
-      iterations: iter,
-      hash: 'SHA-512'
-    },
-    base,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt']
-  );
-}
-
 encBtn.onclick = async () => {
   const file = encFile.files[0];
   const pw   = encPwd.value;
@@ -121,7 +87,7 @@ encBtn.onclick = async () => {
     const CHUNK = 1_048_576; // 1 MiB
     const salt  = crypto.getRandomValues(new Uint8Array(16));
     const iter  = 600_000;
-    const key   = await deriveKey(pw, salt, iter);
+    const key   = await deriveKey(pw, salt, iter, 'encrypt');
 
   const meta = {
     filename : file.name,
@@ -170,7 +136,8 @@ encBtn.onclick = async () => {
     a.href = url;
     a.download = file.name + '.vault';
     a.click();
-    URL.revokeObjectURL(url);
+    // Immediate revoke is spec-racy and can abort the download on some browsers.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
 
     // UI reset
     encBar.classList.remove('bg-warning', 'text-dark', 'progress-bar-striped', 'progress-bar-animated');

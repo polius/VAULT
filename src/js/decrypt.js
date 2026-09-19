@@ -1,6 +1,7 @@
 import { showToast, displayFileInfo, setupDragAndDrop, clearFileInput, confirmLargeFile } from './utils.js';
+import { b64u8, buildAAD, deriveKey } from './crypto-common.js';
 
-const decEnc = new TextEncoder(), decDec = new TextDecoder();
+const decDec = new TextDecoder();
 
 const decFile = document.getElementById('decFile');
 const decPwd = document.getElementById('decPwd');
@@ -40,21 +41,11 @@ decPwdToggle.addEventListener('click', () => {
 // Setup drag & drop
 setupDragAndDrop(decFile, 'decFileInfo');
 
-function b64u8(b) { return Uint8Array.from(atob(b), c => c.charCodeAt(0)) }
-
-// Mirror of encrypt.js: header || LE32(index) || isLast byte.
-function buildAAD(header, index, isLast) {
-  const aad = new Uint8Array(header.length + 5);
-  aad.set(header, 0);
-  new DataView(aad.buffer).setUint32(header.length, index, true);
-  aad[header.length + 4] = isLast ? 1 : 0;
-  return aad;
-}
-
 // The header is attacker-controllable, so validate/clamp it before it drives key
 // derivation or buffer sizing. Unbounded iterations would otherwise hang the tab.
 const MAX_ITERATIONS = 5_000_000;
 const MAX_CHUNK = 64 * 1024 * 1024; // 64 MiB
+const MIN_CHUNK = 4096; // every released version wrote 1 MiB, so a floor is safe
 
 function validateMeta(meta, dataLen) {
   if (typeof meta.salt !== 'string' || meta.salt.length === 0) throw new Error('Invalid metadata: salt');
@@ -62,26 +53,12 @@ function validateMeta(meta, dataLen) {
     throw new Error('Invalid metadata: iterations');
   if (!Number.isInteger(meta.size) || meta.size < 0 || meta.size > dataLen)
     throw new Error('Invalid metadata: size');
-  if (!Number.isInteger(meta.chunk) || meta.chunk < 1 || meta.chunk > MAX_CHUNK)
+  if (!Number.isInteger(meta.chunk) || meta.chunk < MIN_CHUNK || meta.chunk > MAX_CHUNK)
     throw new Error('Invalid metadata: chunk');
   if (typeof meta.filename !== 'string' || meta.filename.length === 0)
     throw new Error('Invalid metadata: filename');
-}
-
-async function deriveKey(pw, salt, iter) {
-  const base = await crypto.subtle.importKey('raw', decEnc.encode(pw), 'PBKDF2', false, ['deriveKey']);
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt,
-      iterations: iter,
-      hash: 'SHA-512'
-    },
-    base,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['decrypt']
-  );
+  if (meta.kdf !== undefined && meta.kdf !== 'PBKDF2') throw new Error('Invalid metadata: kdf');
+  if (meta.hash !== undefined && meta.hash !== 'SHA-512') throw new Error('Invalid metadata: hash');
 }
 
 decBtn.onclick = async () => {
@@ -126,7 +103,7 @@ decBtn.onclick = async () => {
     // AAD in version 2 so any tampering with the metadata fails decryption.
     const header = data.slice(0, offset);
 
-    const key = await deriveKey(pw, b64u8(meta.salt), meta.iterations);
+    const key = await deriveKey(pw, b64u8(meta.salt), meta.iterations, 'decrypt');
 
     // Collect decrypted chunks
     const chunks = [];
@@ -159,7 +136,8 @@ decBtn.onclick = async () => {
     a.href = url;
     a.download = meta.filename;
     a.click();
-    URL.revokeObjectURL(url);
+    // Immediate revoke is spec-racy and can abort the download on some browsers.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
 
     // UI update
     decBar.classList.remove('bg-warning', 'text-dark', 'progress-bar-striped', 'progress-bar-animated');
@@ -175,6 +153,8 @@ decBtn.onclick = async () => {
     clearFileInput(decFile, 'decFileInfo');
     decPwd.value = '';
   } catch (e) {
+    // Keep the user-facing message generic; log details to the console for debugging.
+    console.error('Decryption failed:', e);
     decLog.className = 'status-log error';
     const icon = decLog.querySelector('.success-icon');
     const message = decLog.querySelector('.status-message');
