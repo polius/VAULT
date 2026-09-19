@@ -63,11 +63,3 @@ Once deployed, open your web browser and visit:
 
 - **HTTP**: http://localhost/
 - **HTTPS**: https://yourdomain.com (if configured)
-
-## Development
-
-Run the test suite (requires Node 22+):
-
-```bash
-npm test
-```
