@@ -69,11 +69,13 @@ function makeOpfsEmulator(dir) {
 }
 
 // Bridges sink.js to the real sw.js: postMessage('register') invokes the SW's
-// message listener, then simulates the iframe fetch of /__download/{id}. Each
-// register appends `{ promise }` synchronously; the fetch is dispatched on a
-// microtask — like the browser, it always hits while the transfer entry exists
-// (before any port message, including 'end', is processed).
-export function makeSwBridge() {
+// message listener, then simulates the iframe fetch of /__download/{id}.
+//
+// `fetchAfterEnd` reproduces Firefox's ordering for small files: the page drains
+// the staged OPFS file and sends 'end' before the navigation's fetch event is
+// dispatched, so the fetch must still find a live entry (regression guard for
+// deleting the transfer on 'end', which 404'd the download in Firefox).
+export function makeSwBridge({ fetchAfterEnd = false } = {}) {
   const downloads = [];
   // A real browser keeps transferred ports alive internally; emulate that or
   // the GC may collect port2 between register and delivery (flaky, rare).
@@ -86,12 +88,22 @@ export function makeSwBridge() {
         let resolve;
         const entry = { promise: new Promise((r) => { resolve = r; }) };
         downloads.push(entry);
-        queueMicrotask(() => {
+        const dispatchFetch = () => {
           swListeners.fetch[0]({
             request: { url: `https://vault.local/__download/${msg.id}` },
             respondWith: resolve,
           });
-        });
+        };
+        if (fetchAfterEnd) {
+          const port = msg.port;
+          const swHandler = port.onmessage;
+          port.onmessage = (ev) => {
+            swHandler(ev);
+            if (ev.data && ev.data.type === 'end') dispatchFetch();
+          };
+        } else {
+          queueMicrotask(dispatchFetch);
+        }
       },
     },
   };

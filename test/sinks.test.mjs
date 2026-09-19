@@ -65,6 +65,26 @@ describe('sink round-trips (encrypt -> decrypt per mode)', () => {
     resetSinks();
   });
 
+  it('sw serves the full download even when the fetch arrives after end (Firefox race)', async () => {
+    // Firefox dispatches the iframe navigation after the page finished streaming
+    // small files; deleting the transfer on 'end' used to 404 the download here.
+    const pt = randU8(SIZE);
+    const bridge = makeSwBridge({ fetchAfterEnd: true });
+    installSwSink(path.join(dir, 'opfs-3'), bridge);
+    sinkState.forced = 'sw';
+
+    const { blob } = await encryptRun(pt, 'doc.bin', 'pw');
+    assert.equal(blob, undefined);
+    const enc = new Uint8Array(await (await bridge.downloads[0].promise).arrayBuffer());
+    assert.equal(new TextDecoder().decode(enc.slice(0, 4)), 'AES1');
+
+    const dec = await decryptRun(enc, 'pw');
+    assert.equal(dec, undefined);
+    const ptOut = new Uint8Array(await (await bridge.downloads[1].promise).arrayBuffer());
+    assert.ok(Buffer.from(ptOut).equals(Buffer.from(pt)));
+    resetSinks();
+  });
+
   it('format is sink-independent: sw-produced .vault decrypts via blob', async () => {
     const pt = randU8(SIZE);
     const bridge = makeSwBridge();
