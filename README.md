@@ -24,7 +24,6 @@ Nothing is ever uploaded.
 - **Wrong passwords are caught early**, before any save dialog opens. Truncated, extended or edited files are rejected.
 - **Large files.** Output streams straight to disk where the browser allows it, so file size is limited by your disk, not your memory.
 - **Better passwords.** A strength estimate with a guess-time, a confirmation field, and a 6-word passphrase generator.
-- **Reads older files.** Files made by VAULT 1.x still decrypt.
 - **Light and dark themes**, keyboard and screen-reader friendly.
 
 The `.vault` format is documented in [FORMAT.md](FORMAT.md), and the threat model in [SECURITY.md](SECURITY.md).
@@ -32,8 +31,6 @@ The `.vault` format is documented in [FORMAT.md](FORMAT.md), and the threat mode
 ## Installation
 
 The recommended installation method is **Docker**. The image is a static nginx site that runs as a non-root user and listens on port **8080** inside the container.
-
-> **Upgrading from 1.x?** The container port changed from 80 to 8080. Change `-p 80:80` to `-p 80:8080` (or `"80:80"` to `"80:8080"` in Compose).
 
 #### Run with Docker CLI
 

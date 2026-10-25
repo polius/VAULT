@@ -8,7 +8,7 @@ A redesign of the app and a new file format. Files from VAULT 1.x still decrypt.
 
 ### Breaking
 
-- **The container listens on port 8080**, not 80, and runs as a non-root user. Change `-p 80:80` to `-p 80:8080`.
+- **The container listens on port 8080**, not 80, and runs as a non-root user. Change `-p 80:80` to `-p 80:8080` (or `"80:80"` to `"80:8080"` in Compose).
 - **New file format (version 3).** Files encrypted by 2.0 can't be opened by VAULT 1.x.
 - Empty files encrypted by VAULT 1.x are refused, because that format couldn't authenticate them: any password would have "opened" them.
 
