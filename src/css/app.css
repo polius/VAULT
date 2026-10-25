@@ -1067,11 +1067,28 @@ details[open] > summary::before {
 .footer {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px 28px;
+  width: 100%;
+  max-width: 1040px;
+  margin: 0 auto;
   padding: clamp(16px, 3vh, 32px) max(24px, env(safe-area-inset-right))
     max(clamp(16px, 3vh, 28px), env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
   font-size: 14px;
+  color: var(--faint);
+}
+
+.footer-about,
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 10px;
+}
+
+.footer-links {
+  gap: 8px 28px;
 }
 
 .footer a {
@@ -1155,8 +1172,19 @@ details[open] > summary::before {
 
 @media (max-width: 520px) {
   .footer {
-    gap: 8px 20px;
+    flex-direction: column;
+    gap: 10px;
     font-size: 13px;
+  }
+  .footer-links {
+    gap: 8px 20px;
+  }
+}
+
+@media (max-width: 520px) and (max-height: 720px) {
+  .footer {
+    gap: 6px;
+    padding-block: 6px 12px;
   }
 }
 

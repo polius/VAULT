@@ -69,8 +69,9 @@ test('a generated passphrase is shown, needs no confirmation, can be copied and 
   const src = await makeFile(work, 'a.txt', 1000);
   await pick(page, src.path);
   await page.click('#genBtn');
+  // Generating loads the wordlist first.
+  await expect(page.locator('#encPwd')).toHaveValue(/^[a-z]+(-[a-z]+){5}$/);
   const phrase = await page.inputValue('#encPwd');
-  expect(phrase).toMatch(/^[a-z]+(-[a-z]+){5}$/);
   await expect(page.locator('#encPwd')).toHaveAttribute('type', 'text');
   await expect(page.locator('#generated')).toBeVisible();
   await expect(page.locator('#confirmField')).toBeHidden();
