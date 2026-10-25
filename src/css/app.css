@@ -5,6 +5,7 @@
   --bg: #f5f6f8;
   --surface: #ffffff;
   --surface-2: #f0f2f5;
+  --raised: #ffffff;
   --ink: #111827;
   --muted: #4b5563;
   --faint: #6b7280;
@@ -22,9 +23,11 @@
   --warn-soft: #fdf1dc;
   --focus: #1d5fd6;
   --on-accent: #ffffff;
-  --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 8px 24px -8px rgb(16 24 40 / 12%);
-  --radius: 16px;
-  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgb(16 24 40 / 5%), 0 16px 40px -16px rgb(16 24 40 / 16%);
+  --radius: 20px;
+  --radius-sm: 12px;
+  --glow-a: rgb(29 95 214 / 9%);
+  --glow-b: rgb(4 120 87 / 7%);
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   color-scheme: light;
@@ -34,6 +37,7 @@
   --bg: #0d1117;
   --surface: #161b22;
   --surface-2: #1d232c;
+  --raised: #2a313c;
   --ink: #e8ecf1;
   --muted: #b0b8c4;
   --faint: #8d96a3;
@@ -52,6 +56,8 @@
   --focus: #7cb0ff;
   --on-accent: #08111f;
   --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 12px 32px -12px rgb(0 0 0 / 60%);
+  --glow-a: rgb(91 155 255 / 11%);
+  --glow-b: rgb(62 207 142 / 7%);
   color-scheme: dark;
 }
 
@@ -60,6 +66,7 @@
     --bg: #0d1117;
     --surface: #161b22;
     --surface-2: #1d232c;
+    --raised: #2a313c;
     --ink: #e8ecf1;
     --muted: #b0b8c4;
     --faint: #8d96a3;
@@ -78,6 +85,8 @@
     --focus: #7cb0ff;
     --on-accent: #08111f;
     --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 12px 32px -12px rgb(0 0 0 / 60%);
+    --glow-a: rgb(91 155 255 / 11%);
+    --glow-b: rgb(62 207 142 / 7%);
     color-scheme: dark;
   }
 }
@@ -102,7 +111,10 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background:
+    radial-gradient(42rem 26rem at 38% -6rem, var(--glow-a), transparent 70%),
+    radial-gradient(42rem 26rem at 62% -6rem, var(--glow-b), transparent 70%), var(--bg);
+  background-repeat: no-repeat;
   color: var(--ink);
   font: 400 16px / 1.55 var(--sans);
   -webkit-font-smoothing: antialiased;
@@ -161,12 +173,6 @@ code {
   stroke-linejoin: round;
 }
 
-.icon .fill,
-.icon .solid {
-  fill: currentColor;
-  stroke: none;
-}
-
 .icon-lg {
   width: 28px;
   height: 28px;
@@ -188,7 +194,7 @@ code {
   width: 100%;
   max-width: 1040px;
   margin: 0 auto;
-  padding: 20px max(20px, env(safe-area-inset-right)) 0 max(20px, env(safe-area-inset-left));
+  padding: 22px max(24px, env(safe-area-inset-right)) 0 max(24px, env(safe-area-inset-left));
 }
 
 .brand {
@@ -200,34 +206,35 @@ code {
 }
 
 .wordmark {
-  font-weight: 600;
-  font-size: 17px;
-  letter-spacing: 0.22em;
+  font-weight: 650;
+  font-size: 16px;
+  letter-spacing: 0.24em;
 }
 
 .topbar-end {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .theme-switch {
   display: inline-flex;
   margin: 0;
   min-width: 0;
+  height: 38px;
   padding: 3px;
   border-radius: 999px;
-  background: var(--surface-2);
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
   border: 1px solid var(--line);
 }
 
 .theme-switch button {
   font: 500 13px / 1 var(--sans);
-  color: var(--muted);
+  color: var(--faint);
   background: none;
   border: 0;
   border-radius: 999px;
-  padding: 7px 11px;
+  padding: 0 12px;
   cursor: pointer;
 }
 
@@ -236,7 +243,7 @@ code {
 }
 
 .theme-switch button[aria-pressed="true"] {
-  background: var(--surface);
+  background: var(--raised);
   color: var(--ink);
   box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
 }
@@ -244,15 +251,25 @@ code {
 .icon-link {
   display: inline-grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
   color: var(--muted);
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.icon-link .icon {
+  width: 18px;
+  height: 18px;
 }
 
 .icon-link:hover {
   color: var(--ink);
-  background: var(--surface-2);
+  border-color: var(--line-strong);
 }
 
 /* ---------- page ---------- */
@@ -272,32 +289,39 @@ code {
 .page {
   flex: 1;
   width: 100%;
-  max-width: 640px;
+  max-width: 768px;
   margin: 0 auto;
-  padding: 48px max(20px, env(safe-area-inset-right)) 24px max(20px, env(safe-area-inset-left));
+  padding: clamp(48px, 9vh, 88px) max(24px, env(safe-area-inset-right)) 32px max(24px, env(safe-area-inset-left));
   display: grid;
-  gap: 24px;
+  gap: 40px;
   align-content: start;
+}
+
+/* The intro may run wider than the card so the lede stays on one line. */
+.page > :not(.intro) {
+  width: 100%;
+  max-width: 640px;
+  justify-self: center;
 }
 
 .intro {
   display: grid;
-  gap: 8px;
+  gap: clamp(18px, 2.6vw, 24px);
   text-align: center;
 }
 
 h1 {
-  font-size: clamp(26px, 5vw, 34px);
-  line-height: 1.15;
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  font-size: clamp(30px, 5.4vw, 46px);
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.028em;
   text-wrap: balance;
 }
 
 .lede {
   color: var(--muted);
-  font-size: 17px;
-  text-wrap: balance;
+  font-size: clamp(16px, 2.2vw, 18px);
+  text-wrap: pretty;
 }
 
 .panel {
@@ -305,7 +329,7 @@ h1 {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   border: 1px solid var(--line);
-  padding: 24px;
+  padding: 36px;
 }
 
 /* ---------- pick ---------- */
@@ -313,10 +337,10 @@ h1 {
 .dropzone {
   display: grid;
   justify-items: center;
-  gap: 10px;
-  padding: 40px 20px 32px;
-  border: 2px dashed var(--line-strong);
-  border-radius: 12px;
+  gap: 8px;
+  padding: 48px 24px 44px;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: 14px;
   text-align: center;
   color: var(--muted);
   cursor: pointer;
@@ -332,12 +356,21 @@ body.dragging .dropzone {
 }
 
 .dropzone > .icon {
+  box-sizing: content-box;
+  width: 28px;
+  height: 28px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border-radius: 999px;
   color: var(--lock);
+  background: var(--lock-soft);
+  stroke-width: 1.7;
 }
 
 .dropzone-title {
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--ink);
 }
 
@@ -362,8 +395,8 @@ body.dragging .dropzone {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 10px;
-  margin-top: 10px;
+  gap: 12px;
+  margin-top: 20px;
 }
 
 /* ---------- buttons ---------- */
@@ -372,9 +405,9 @@ body.dragging .dropzone {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 10px 18px;
+  gap: 9px;
+  min-height: 46px;
+  padding: 11px 20px;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   font: 600 15px / 1.2 var(--sans);
@@ -435,6 +468,8 @@ body.dragging .dropzone {
 
 .btn-wide {
   width: 100%;
+  min-height: 52px;
+  font-size: 16px;
 }
 
 .icon-btn {
@@ -460,7 +495,7 @@ body.dragging .dropzone {
 .job,
 .form {
   display: grid;
-  gap: 18px;
+  gap: 24px;
 }
 
 .mode {
@@ -478,7 +513,7 @@ body.dragging .dropzone {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 42px;
+  min-height: 44px;
   border-radius: 9px;
   font-weight: 600;
   color: var(--muted);
@@ -494,7 +529,7 @@ body.dragging .dropzone {
 }
 
 .mode-opt:has(input:checked) {
-  background: var(--surface);
+  background: var(--raised);
   box-shadow: 0 1px 3px rgb(0 0 0 / 14%);
 }
 
@@ -519,10 +554,11 @@ body.dragging .dropzone {
 .selection {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 8px 12px 14px;
+  gap: 14px;
+  padding: 14px 10px 14px 18px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-2) 45%, transparent);
 }
 
 .selection-icon {
@@ -549,14 +585,9 @@ body.dragging .dropzone {
 }
 
 .file-list {
-  margin-top: -8px;
+  margin-top: -12px;
   font-size: 14px;
   color: var(--muted);
-}
-
-.file-list summary {
-  cursor: pointer;
-  width: max-content;
 }
 
 .file-list ul {
@@ -588,14 +619,14 @@ body.dragging .dropzone {
 }
 
 .vault-info {
-  margin-top: -6px;
+  margin-top: -12px;
   font-size: 14px;
   color: var(--muted);
 }
 
 .field {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 label {
@@ -622,7 +653,7 @@ label {
 .input-row input {
   flex: 1;
   min-width: 0;
-  padding: 11px 14px;
+  padding: 13px 16px;
   border: 0;
   background: none;
   color: var(--ink);
@@ -636,7 +667,7 @@ label {
 
 .input-row input[type="text"] {
   font-family: var(--mono);
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .input-row:has(input[aria-invalid="true"]) {
@@ -658,8 +689,10 @@ label {
 
 .meter {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 6px 14px;
+  margin-top: 2px;
 }
 
 .meter-bar {
@@ -703,33 +736,67 @@ label {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 10px;
-  margin-top: -6px;
-  padding: 12px 14px;
+  gap: 14px;
+  padding: 16px 16px 16px 18px;
   background: var(--lock-soft);
-  border-radius: 12px;
+  border-radius: 14px;
   font-size: 14px;
+  line-height: 1.5;
 }
 
 .generated > .icon {
   color: var(--lock);
 }
 
-.options summary {
+summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  list-style: none;
   cursor: pointer;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+summary::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin: 0 2px;
+  border-right: 1.75px solid currentColor;
+  border-bottom: 1.75px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+details[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.options summary {
   font-weight: 600;
   font-size: 15px;
-  width: max-content;
+  color: var(--muted);
+}
+
+.options summary:hover {
+  color: var(--ink);
 }
 
 .check {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  margin-top: 10px;
+  margin-top: 14px;
   font-weight: 400;
   cursor: pointer;
   overflow-wrap: anywhere;
+}
+
+.check code {
+  white-space: nowrap;
 }
 
 .check input {
@@ -747,9 +814,9 @@ label {
 
 .notice {
   display: flex;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 12px;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 14px;
   background: var(--surface-2);
   font-size: 15px;
 }
@@ -792,8 +859,9 @@ label {
 
 .work {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   justify-items: start;
+  padding: 8px 0 4px;
 }
 
 .work-head {
@@ -850,16 +918,16 @@ label {
 .done {
   display: grid;
   justify-items: center;
-  gap: 8px;
+  gap: 10px;
   text-align: center;
-  padding: 8px 0;
+  padding: 16px 0 8px;
 }
 
 .done-badge {
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 64px;
   border-radius: 999px;
   color: var(--unlock);
   background: var(--unlock-soft);
@@ -884,7 +952,7 @@ label {
   color: var(--muted);
   font-size: 15px;
   max-width: 44ch;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 /* ---------- drag overlay ---------- */
@@ -917,23 +985,27 @@ label {
 /* ---------- how / footer ---------- */
 
 .how {
+  margin-top: -8px;
   padding: 0 4px;
   color: var(--muted);
   font-size: 15px;
 }
 
 .how summary {
-  cursor: pointer;
   font-weight: 600;
-  color: var(--ink);
-  width: max-content;
+  color: var(--muted);
   max-width: 100%;
+}
+
+.how summary:hover,
+.how[open] summary {
+  color: var(--ink);
 }
 
 .how ul {
   display: grid;
-  gap: 10px;
-  margin: 14px 0;
+  gap: 12px;
+  margin: 18px 0;
   padding-left: 20px;
 }
 
@@ -945,29 +1017,35 @@ label {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px 22px;
-  padding: 24px max(20px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom))
-    max(20px, env(safe-area-inset-left));
+  gap: 8px 28px;
+  padding: 40px max(24px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom))
+    max(24px, env(safe-area-inset-left));
   font-size: 14px;
 }
 
 .footer a {
-  color: var(--muted);
+  color: var(--faint);
+  text-decoration: none;
 }
 
 .footer a:hover {
   color: var(--ink);
+  text-decoration: underline;
 }
 
 @media (max-width: 520px) {
+  .topbar {
+    padding-inline: 16px;
+  }
   .page {
-    padding-top: 28px;
+    padding: 36px 16px 24px;
+    gap: 28px;
   }
   .panel {
-    padding: 18px;
+    padding: 20px;
   }
   .dropzone {
-    padding: 28px 14px 24px;
+    padding: 32px 16px 28px;
   }
   .pick-buttons .btn {
     flex: 1 1 100%;
