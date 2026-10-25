@@ -93,4 +93,4 @@ In short: everything happens in your browser, and nothing you drop on the page i
 
 ## License
 
-[MIT](LICENSE). Third-party components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[MIT](LICENSE).
