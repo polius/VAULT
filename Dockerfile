@@ -9,7 +9,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY src /vault
 
 # Readable by the nginx user whatever the host umask was. Nothing is writable:
-# the container also runs with --read-only (nginx only needs /tmp).
+# the container can also run with --read-only (nginx then needs a tmpfs on /tmp).
 USER root
 RUN chmod -R a+rX,go-w /vault /etc/nginx/conf.d/default.conf
 USER 101

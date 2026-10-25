@@ -39,7 +39,7 @@ CI runs them against the Docker image instead:
 
 ```bash
 docker build -t vault:dev .
-docker run -d --rm -p 127.0.0.1:8080:8080 --read-only --tmpfs /tmp vault:dev
+docker run -d --rm -p 127.0.0.1:8080:8080 vault:dev
 cd e2e && BASE_URL=http://127.0.0.1:8080 npx playwright test
 ```
 

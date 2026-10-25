@@ -38,7 +38,7 @@ The recommended installation method is **Docker**. The image is a static nginx s
 #### Run with Docker CLI
 
 ```bash
-docker run -d --name vault -p 80:8080 --read-only --tmpfs /tmp poliuscorp/vault
+docker run -d --name vault -p 80:8080 poliuscorp/vault
 ```
 
 #### Run with Docker Compose
@@ -50,9 +50,6 @@ services:
     container_name: vault
     ports:
       - "80:8080"
-    read_only: true
-    tmpfs:
-      - /tmp
     restart: unless-stopped
 ```
 
