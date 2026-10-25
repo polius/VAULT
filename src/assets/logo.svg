@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 16 16">
+  <title>VAULT</title>
   <defs>
     <!-- Diagonal clip path from top-right to bottom-left -->
     <clipPath id="topLeft">

@@ -1,251 +1,259 @@
-// Sink: where output bytes go, ported from FileSync. Three implementations:
-//   'fs'   File System Access API (Chromium, secure context): streams straight to disk.
-//   'sw'   Service Worker download: bytes stage into OPFS, then stream through a
-//          MessageChannel into an intercepted /__download/{id} response at close().
-//   'blob' In-memory Blob fallback (plain HTTP / old browsers). Holds the whole output.
+// Sinks: where output bytes go.
+//   'fs'   File System Access API (Chromium, secure context): writes straight to the chosen file.
+//   'sw'   Service Worker download: bytes stream through a MessagePort into an
+//          intercepted download response, with backpressure. Nothing is staged on disk.
+//   'blob' In-memory Blob, then a download link. Holds the whole output.
 //
-// Common interface:
-//   const sink = await openSink({ id, name, size, mime })
-//   await sink.write(uint8Array)   await sink.close()   await sink.abort(reason?)
+//   const sink = await openSink({ name, size, mime })
+//   await sink.write(bytes)   await sink.close()   await sink.abort()
 //
-// Selection priority is fs > sw > blob. AbortError (user dismissed the save
-// picker) is never swallowed into a fallback.
+// write() never modifies or detaches the caller's bytes, and callers never
+// modify bytes after passing them to write().
+//
+// Selection: fs > sw > blob. AbortError (the user dismissed a save dialog or
+// cancelled the download) is never turned into a fallback.
 
-const SINK_MODES = ['auto', 'fs', 'sw', 'blob'];
+import { scriptURL } from './tt.js';
 
-// Debug/testing override: /?sink=fs|sw|blob forces a mode for one page load.
+const MODES = ['fs', 'sw', 'blob'];
+const SW_READY_TIMEOUT_MS = 4000;
+const SW_HANDSHAKE_TIMEOUT_MS = 5000;
+const SW_START_TIMEOUT_MS = 5000;
+const SW_KEEPALIVE_MS = 10_000;
+
+// Testing override: ?sink=fs|sw|blob forces a mode for one page load.
 function readOverride() {
   try {
-    const mode = new URLSearchParams(window.location.search).get('sink');
-    return mode && SINK_MODES.includes(mode) && mode !== 'auto' ? mode : null;
+    const mode = new URLSearchParams(globalThis.location?.search).get('sink');
+    return MODES.includes(mode) ? mode : null;
   } catch {
     return null;
   }
 }
 
-function detectSinkAvailability() {
-  const secure = typeof window !== 'undefined' && window.isSecureContext === true;
-  const out = {
-    fs:   { available: false, reason: '' },
-    sw:   { available: false, reason: '' },
-    blob: { available: true,  reason: 'Available (always — fallback path).' },
-  };
-  if (typeof window === 'undefined') return out;
-
-  if (typeof window.showSaveFilePicker !== 'function') {
-    out.fs.reason = 'Not supported by this browser (Chromium-only API).';
-  } else if (!secure) {
-    out.fs.reason = 'Requires HTTPS or localhost (secure context).';
-  } else {
-    out.fs.available = true;
-  }
-
-  if (!('serviceWorker' in navigator)) {
-    out.sw.reason = 'Not supported by this browser.';
-  } else if (!secure) {
-    out.sw.reason = 'Requires HTTPS or localhost (secure context).';
-  } else {
-    // The worker may still be installing; registerServiceWorker() refines this.
-    out.sw.available = true;
-  }
-  return out;
-}
-
-function detectAuto(avail) {
-  if (avail.fs.available) return 'fs';
-  if (avail.sw.available) return 'sw';
-  return 'blob';
-}
+const secure = () => globalThis.isSecureContext === true;
+const hasFs = () => typeof globalThis.showSaveFilePicker === 'function' && secure();
+const hasSw = () =>
+  typeof navigator !== 'undefined' && 'serviceWorker' in navigator && secure() && !sinkState.swBypassed;
 
 export const sinkState = {
   forced: readOverride(),
-  availability: detectSinkAvailability(),
-  auto: detectAuto(detectSinkAvailability()),
-  serviceWorkerReady: false,
-  serviceWorkerRegistration: null,
+  registration: null,
+  swBypassed: false, // the browser sent a download past the worker; don't try again
+  ready: null, // Promise<ServiceWorkerRegistration|null>, set by registerServiceWorker()
 };
 
-export function resolveSinkMode() {
-  const mode = sinkState.forced || sinkState.auto;
-  if (mode === 'fs' && typeof window.showSaveFilePicker !== 'function')
-    throw new Error('File System Access API is not available in this browser.');
-  if (mode === 'sw') {
-    if (!window.isSecureContext) throw new Error('Service Worker sink requires HTTPS (or localhost).');
-    if (!('serviceWorker' in navigator)) throw new Error('Service Workers are not available in this browser.');
-    if (!sinkState.serviceWorkerReady) throw new Error('Service Worker has not finished registering yet.');
-  }
-  return mode;
-}
+let registering = null;
 
-// Cap the wait for a stuck worker so app boot never hangs on a failed install.
-const SW_ACTIVATION_TIMEOUT_MS = 10_000;
-
-export async function registerServiceWorker() {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
-  if (!window.isSecureContext) return;
-  try {
-    // updateViaCache:'none' — SW update checks must never be served from the
-    // HTTP cache, or a deployed worker fix can stay invisible for hours.
-    const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' });
-    sinkState.serviceWorkerRegistration = reg;
-    if (reg.active) {
-      sinkState.serviceWorkerReady = true;
-    } else {
-      const activated = await new Promise((resolve) => {
-        const worker = reg.installing || reg.waiting;
-        if (!worker) { resolve(false); return; }
-        let done = false;
-        const finish = (ok) => { if (done) return; done = true; resolve(ok); };
-        worker.addEventListener('statechange', () => {
-          if (worker.state === 'activated') finish(true);
-          else if (worker.state === 'redundant') finish(false);
-        });
-        setTimeout(() => finish(false), SW_ACTIVATION_TIMEOUT_MS);
+// Idempotent. Resolves to the active registration, or null if unavailable.
+export function registerServiceWorker() {
+  if (registering) return registering;
+  registering = (async () => {
+    if (!hasSw()) return null;
+    try {
+      const reg = await navigator.serviceWorker.register(scriptURL('../sw.js'), {
+        scope: new URL('../', import.meta.url).pathname,
+        updateViaCache: 'none',
       });
-      sinkState.serviceWorkerReady = activated;
+      const worker = reg.active ?? reg.installing ?? reg.waiting;
+      if (!reg.active && worker) {
+        await new Promise((resolve) => {
+          const done = () => worker.state === 'activated' || worker.state === 'redundant';
+          if (done()) return resolve();
+          worker.addEventListener('statechange', () => done() && resolve());
+        });
+      }
+      sinkState.registration = reg.active ? reg : null;
+      return sinkState.registration;
+    } catch (err) {
+      console.warn('Service Worker registration failed:', err);
+      return null;
     }
-    if (!sinkState.serviceWorkerReady) {
-      sinkState.availability.sw.available = false;
-    }
-    sinkState.auto = detectAuto(sinkState.availability);
-  } catch (err) {
-    console.warn('Service Worker registration failed:', err);
-    sinkState.availability.sw.available = false;
-    sinkState.auto = detectAuto(sinkState.availability);
+  })();
+  sinkState.ready = registering;
+  return registering;
+}
+
+async function swAvailable() {
+  if (!hasSw()) return false;
+  const reg = await Promise.race([
+    registerServiceWorker(),
+    new Promise((r) => setTimeout(() => r(null), SW_READY_TIMEOUT_MS)),
+  ]);
+  return Boolean(reg?.active);
+}
+
+// The mode that openSink() will try first. 'blob' means the whole output is
+// held in memory, which the UI warns about for large outputs.
+export async function preferredMode() {
+  if (sinkState.forced) return sinkState.forced;
+  if (hasFs()) return 'fs';
+  if (await swAvailable()) return 'sw';
+  return 'blob';
+}
+
+// VAULT 1.x staged Service Worker downloads in the origin-private file system
+// and could leave plaintext behind. Remove any leftovers.
+export async function sweepLegacyStaging() {
+  try {
+    const root = await navigator.storage?.getDirectory?.();
+    if (!root) return 0;
+    const stale = [];
+    for await (const name of root.keys()) if (name.startsWith('vault-part-')) stale.push(name);
+    await Promise.all(stale.map((n) => root.removeEntry(n).catch(() => {})));
+    return stale.length;
+  } catch {
+    return 0;
   }
 }
 
-async function openFsSink({ name, mime }) {
-  const handle = await window.showSaveFilePicker({
+async function openFsSink({ name }) {
+  const dot = name.lastIndexOf('.');
+  const ext = dot > 0 ? name.slice(dot) : '';
+  const handle = await globalThis.showSaveFilePicker({
     suggestedName: name,
-    types: mime ? [{ description: 'File', accept: { [mime]: [extensionFromName(name)] } }] : undefined,
+    ...(/^\.[\w-]{1,16}$/.test(ext)
+      ? { types: [{ description: 'File', accept: { 'application/octet-stream': [ext] } }] }
+      : {}),
   });
   const writable = await handle.createWritable();
   return {
     mode: 'fs',
-    async write(chunk) { await writable.write(chunk); },
-    async close() { await writable.close(); },
+    name: handle.name,
+    write: (bytes) => writable.write(bytes),
+    close: () => writable.close(),
     async abort() {
-      try { await writable.abort(); } catch {}
+      await writable.abort().catch(() => {});
     },
   };
 }
 
-function extensionFromName(name) {
-  const idx = name.lastIndexOf('.');
-  return idx >= 0 ? name.slice(idx) : '';
-}
+async function openSwSink({ name, size, mime }) {
+  if (!(await swAvailable())) throw new Error('Service Worker is not active');
+  const reg = sinkState.registration;
+  const id = crypto.randomUUID();
+  const channel = new MessageChannel();
+  const port = channel.port1;
 
-// Stages bytes into an OPFS file, then at close() streams it into the SW response.
-// A failed transfer never leaves a partial download behind.
-async function openSwSink({ id, name, size, mime }) {
-  if (!navigator.storage || typeof navigator.storage.getDirectory !== 'function') {
-    throw new Error('OPFS is not available in this browser.');
-  }
-  const root = await navigator.storage.getDirectory();
-  const stagingName = `vault-part-${id}`;
-  try { await root.removeEntry(stagingName); } catch {}
-  const handle = await root.getFileHandle(stagingName, { create: true });
-  const writable = await handle.createWritable();
-
-  const deliver = async () => {
-    await writable.close();
-    const reg = sinkState.serviceWorkerRegistration;
-    const sw = reg && reg.active;
-    if (!sw) throw new Error('Service Worker not available.');
-
-    const channel = new MessageChannel();
-    const ready = new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Service Worker did not respond.')), 5000);
-      channel.port1.onmessage = (ev) => {
-        if (ev.data?.type === 'ready') { clearTimeout(timeout); resolve(); }
-      };
-    });
-
-    sw.postMessage({ type: 'register', id, name, size, mime, port: channel.port2 }, [channel.port2]);
-    await ready;
-
-    // Trigger the download by navigating a hidden iframe to the intercepted URL.
-    const iframe = document.createElement('iframe');
-    iframe.hidden = true;
-    iframe.src = `/__download/${encodeURIComponent(id)}`;
-    document.body.appendChild(iframe);
-
-    const port = channel.port1;
-    const stagedFile = await handle.getFile();
-    const reader = stagedFile.stream().getReader();
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      const buf = value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
-      port.postMessage(buf, [buf]);
+  let credits = 0;
+  let failure = null;
+  let wake = null;
+  let handshake;
+  let timer;
+  const ready = new Promise((resolve, reject) => {
+    handshake = resolve;
+    timer = setTimeout(() => reject(new Error('Service Worker did not respond')), SW_HANDSHAKE_TIMEOUT_MS);
+  }).finally(() => clearTimeout(timer));
+  let start;
+  const started = new Promise((resolve) => {
+    start = resolve;
+  });
+  port.onmessage = ({ data }) => {
+    if (data?.type === 'ready') handshake();
+    else if (data?.type === 'start') start(true);
+    else if (data?.type === 'pull') credits++;
+    else if (data?.type === 'cancel') {
+      failure = new DOMException('The download was cancelled', 'AbortError');
+      port.close();
     }
-    port.postMessage({ type: 'end' });
-    port.close();
-    setTimeout(() => iframe.remove(), 1000);
-    setTimeout(() => { root.removeEntry(stagingName).catch(() => {}); }, 30_000);
+    wake?.();
   };
+
+  reg.active.postMessage({ type: 'register', id, name, size, mime, port: channel.port2 }, [channel.port2]);
+  await ready;
+
+  const iframe = document.createElement('iframe');
+  iframe.hidden = true;
+  iframe.title = 'Download';
+  iframe.src = new URL(`../__download/${encodeURIComponent(id)}`, import.meta.url).href;
+  document.body.appendChild(iframe);
+
+  // Message events keep the worker alive during long transfers.
+  const keepalive = setInterval(() => reg.active?.postMessage({ type: 'ping' }), SW_KEEPALIVE_MS);
+  const cleanup = () => {
+    clearInterval(keepalive);
+    setTimeout(() => iframe.remove(), 30_000);
+  };
+
+  // If the browser sent the request past the worker (the server then answers
+  // 404), nothing would ever pull: give up so openSink() tries the next sink.
+  if (!(await Promise.race([started, new Promise((r) => setTimeout(() => r(false), SW_START_TIMEOUT_MS))]))) {
+    clearInterval(keepalive);
+    iframe.remove();
+    port.postMessage({ type: 'abort' });
+    port.close();
+    sinkState.swBypassed = true;
+    throw new Error('The browser did not send the download through the Service Worker');
+  }
 
   return {
     mode: 'sw',
-    async write(chunk) { await writable.write(chunk); },
-    async close() { await deliver(); },
+    name,
+    async write(bytes) {
+      while (!credits && !failure) await new Promise((r) => (wake = r));
+      if (failure) throw failure;
+      credits--;
+      // Transfer a copy: callers may still need their bytes (format.js reuses the header).
+      const buf = bytes.slice().buffer;
+      port.postMessage(buf, [buf]);
+    },
+    async close() {
+      port.postMessage({ type: 'end' });
+      port.close();
+      cleanup();
+    },
     async abort() {
-      try { await writable.close(); } catch {}
-      try { await root.removeEntry(stagingName); } catch {}
+      failure ??= new DOMException('Cancelled', 'AbortError');
+      wake?.();
+      port.postMessage({ type: 'abort' });
+      port.close();
+      cleanup();
     },
   };
 }
 
 function openBlobSink({ name, mime }) {
-  const chunks = [];
+  let parts = [];
   return {
     mode: 'blob',
-    async write(chunk) {
-      // Copy into a stable reference; the caller may reuse the buffer.
-      chunks.push(new Uint8Array(chunk));
+    name,
+    async write(bytes) {
+      parts.push(bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength ? bytes : bytes.slice());
     },
     async close() {
-      const blob = new Blob(chunks, mime ? { type: mime } : undefined);
-      chunks.length = 0;
-      const url = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(new Blob(parts, { type: mime || 'application/octet-stream' }));
+      parts = [];
       const a = document.createElement('a');
       a.href = url;
       a.download = name;
+      a.hidden = true;
       document.body.appendChild(a);
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     },
     async abort() {
-      chunks.length = 0;
+      parts = [];
     },
   };
 }
 
-export async function openSink({ id, name, size, mime }) {
-  const mode = resolveSinkMode();
-  try {
-    if (mode === 'fs') return await openFsSink({ name, mime });
-    if (mode === 'sw') return await openSwSink({ id, name, size, mime });
-    return openBlobSink({ name, mime });
-  } catch (err) {
-    // User cancel (dismissed save picker) propagates without fallback.
-    if (err && err.name === 'AbortError') throw err;
-    // Forced mode: surface the real error instead of masking it.
-    if (sinkState.forced) throw err;
-    // Otherwise fall down the chain fs -> sw -> blob.
-    if (mode === 'fs') {
-      try {
-        if (sinkState.availability.sw.available && sinkState.serviceWorkerReady) {
-          return await openSwSink({ id, name, size, mime });
-        }
-      } catch (swErr) {
-        if (swErr && swErr.name === 'AbortError') throw swErr;
-      }
-      return openBlobSink({ name, mime });
+const openers = { fs: openFsSink, sw: openSwSink, blob: openBlobSink };
+
+export async function openSink(opts) {
+  const first = await preferredMode();
+  const chain = sinkState.forced ? [first] : MODES.slice(MODES.indexOf(first));
+  let lastErr;
+  for (const mode of chain) {
+    try {
+      return await openers[mode](opts);
+    } catch (err) {
+      if (err?.name === 'AbortError') throw err;
+      // The save dialog needs a recent click; let the caller ask for one.
+      if (mode === 'fs' && (err?.name === 'SecurityError' || err?.name === 'NotAllowedError')) throw err;
+      console.warn(`Sink '${mode}' failed, trying the next one:`, err);
+      lastErr = err;
     }
-    if (mode === 'sw') return openBlobSink({ name, mime });
-    throw err;
   }
+  throw lastErr;
 }

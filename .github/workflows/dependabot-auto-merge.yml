@@ -1,9 +1,10 @@
 name: Dependabot auto-merge
 
-# Automatically approve and merge Dependabot pull requests, excluding major
-# version bumps (those need human review). Requires two repository settings:
-#   1. Settings → General → Pull Requests → "Allow auto-merge"
-#   2. Settings → Actions → General → Workflow permissions →
+# Approves and auto-merges Dependabot pull requests, except major version bumps
+# (those need a human). Branch protection still requires the Tests workflow.
+# Needs two repository settings:
+#   1. Settings > General > Pull Requests > "Allow auto-merge"
+#   2. Settings > Actions > General > Workflow permissions >
 #      "Allow GitHub Actions to create and approve pull requests"
 
 on: pull_request
@@ -19,7 +20,7 @@ jobs:
     steps:
       - name: Fetch Dependabot metadata
         id: metadata
-        uses: dependabot/fetch-metadata@v3
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 

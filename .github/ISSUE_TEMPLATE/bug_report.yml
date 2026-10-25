@@ -1,0 +1,57 @@
+name: Bug report
+description: Something doesn't work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Security problems go to [a private advisory](https://github.com/polius/vault/security/advisories/new) instead.
+        Never attach a `.vault` file that holds real data, or share a real password.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead. Include the exact error message if there was one.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Drop a 2 GB file
+        2. Generate a passphrase
+        3. Click Encrypt
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: VAULT version
+      description: Shown in the page footer.
+      placeholder: "2.0.0"
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and operating system
+      placeholder: "Firefox 140 on macOS 26"
+    validations:
+      required: true
+  - type: dropdown
+    id: hosting
+    attributes:
+      label: Where are you running VAULT?
+      options:
+        - vault.alzina.dev
+        - Docker image
+        - Docker Compose with Caddy (deploy folder)
+        - Other (describe below)
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Browser console errors, file sizes, reverse proxy or CDN setup, screenshots.

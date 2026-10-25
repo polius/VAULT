@@ -1,28 +1,46 @@
 version: 2
 updates:
-  # Keep the GitHub Actions used by the release workflow up to date.
+  # GitHub Actions are pinned by commit SHA; Dependabot bumps SHA and comment together.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-    labels:
-      - "dependencies"
+    labels: ["dependencies"]
     groups:
       github-actions:
-        patterns:
-          - "*"
+        patterns: ["*"]
 
-  # Keep the nginx base image in the Dockerfile up to date.
-  # NOTE: Dependabot can only bump a versioned tag. A floating tag such as
-  # "nginx:alpine" has no version to compare, so pin it (e.g. "nginx:1.27-alpine"
-  # or a digest) for Dependabot to open update PRs.
+  # nginx base image (tag and digest).
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
-    labels:
-      - "dependencies"
+    labels: ["dependencies"]
+
+  # Caddy in the HTTPS compose file.
+  - package-ecosystem: "docker-compose"
+    directory: "/deploy"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies"]
+
+  # Dev tooling and the vendored hash-wasm source. After a hash-wasm bump, run
+  # `npm run vendor`; CI's vendor:check fails until the vendored file matches.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies"]
     groups:
-      docker:
-        patterns:
-          - "*"
+      dev:
+        patterns: ["*"]
+
+  # Playwright and axe for the E2E suite.
+  - package-ecosystem: "npm"
+    directory: "/e2e"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies"]
+    groups:
+      e2e:
+        patterns: ["*"]

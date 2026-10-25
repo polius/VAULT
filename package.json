@@ -1,9 +1,21 @@
 {
   "name": "vault",
-  "version": "1.6.1",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "lint": "biome ci .",
+    "format": "biome check --write .",
+    "vendor": "node scripts/vendor.mjs",
+    "vendor:check": "node scripts/vendor.mjs --check",
+    "serve": "node scripts/serve.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.3",
+    "hash-wasm": "4.12.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

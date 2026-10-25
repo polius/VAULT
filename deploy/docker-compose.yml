@@ -1,19 +1,32 @@
+# VAULT behind Caddy with automatic HTTPS. See the README.
 services:
   caddy:
-    image: caddy
+    image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
     container_name: vault-caddy
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - vault:/data
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - vault
     restart: unless-stopped
 
   vault:
     image: poliuscorp/vault
     container_name: vault
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
 volumes:
-  vault:
+  caddy_data:
+  caddy_config:
