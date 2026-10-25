@@ -917,6 +917,7 @@ details[open] > summary::before {
 
 .panel[data-mode="decrypt"] {
   --accent: var(--unlock);
+  --accent-soft: var(--unlock-soft);
 }
 
 /* ---------- done ---------- */
@@ -924,41 +925,85 @@ details[open] > summary::before {
 .done {
   display: grid;
   justify-items: center;
-  gap: 10px;
   text-align: center;
-  padding: 16px 0 8px;
+  padding: 12px 0 4px;
 }
 
 .done-badge {
   display: grid;
   place-items: center;
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   border-radius: 999px;
   color: var(--unlock);
   background: var(--unlock-soft);
-  margin-bottom: 4px;
 }
 
 .done h2 {
-  font-size: 20px;
+  margin-top: 14px;
+  font-size: 24px;
+  letter-spacing: -0.015em;
 }
 
 .done h2:focus {
   outline: none;
 }
 
+.done-file {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-top: 24px;
+  padding: 14px 18px 14px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-2) 45%, transparent);
+  text-align: left;
+}
+
+.done-file-icon {
+  flex: none;
+  box-sizing: content-box;
+  padding: 10px;
+  border-radius: 999px;
+  color: var(--accent, var(--lock));
+  background: var(--accent-soft, var(--lock-soft));
+}
+
+.done-file-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
 .done-name {
-  font-family: var(--mono);
-  font-size: 15px;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
   overflow-wrap: anywhere;
 }
 
+.done-meta {
+  font-size: 14px;
+  color: var(--muted);
+}
+
 .done-detail {
+  display: grid;
+  gap: 4px;
+  margin-top: 16px;
   color: var(--muted);
   font-size: 15px;
-  max-width: 44ch;
-  margin-bottom: 16px;
+  text-wrap: balance;
+}
+
+.done-detail:empty {
+  display: none;
+}
+
+.done .btn {
+  margin-top: 28px;
 }
 
 /* ---------- drag overlay ---------- */

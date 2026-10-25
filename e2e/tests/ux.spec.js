@@ -20,6 +20,21 @@ test('Encrypt needs a matching confirmation (audit H6)', async ({ page, work, pr
   expect(problems).toEqual([]);
 });
 
+test('Tab goes from Password straight to Confirm', async ({ page, work, problems, browserName }) => {
+  await openApp(page, 'blob');
+  const src = await makeFile(work, 'a.txt', 10);
+  await pick(page, src.path);
+  await expect(page.locator('#encPwd')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#encPwd2')).toBeFocused();
+  // The buttons beside Password stay reachable, backwards.
+  if (browserName !== 'webkit') {
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.locator('#encShow')).toBeFocused();
+  }
+  expect(problems).toEqual([]);
+});
+
 test('a weak password needs a second, explicit click (audit M4)', async ({ page, work, problems }) => {
   await openApp(page, 'blob');
   const src = await makeFile(work, 'a.txt', 10);

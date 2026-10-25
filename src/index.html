@@ -184,8 +184,14 @@
       <div class="done" id="done" hidden>
         <div class="done-badge"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-check"/></svg></div>
         <h2 id="doneTitle" tabindex="-1">Done</h2>
-        <p class="done-name" id="doneName"></p>
-        <p class="done-detail" id="doneDetail"></p>
+        <div class="done-file">
+          <svg class="icon icon-lg done-file-icon" id="doneIcon" aria-hidden="true"><use href="#i-vault"/></svg>
+          <div class="done-file-text">
+            <p class="done-name" id="doneName"></p>
+            <p class="done-meta" id="doneMeta"></p>
+          </div>
+        </div>
+        <div class="done-detail" id="doneDetail"></div>
         <button type="button" class="btn btn-secondary" id="againBtn">Encrypt or decrypt another file</button>
       </div>
 

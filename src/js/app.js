@@ -74,7 +74,9 @@ const ui = Object.fromEntries(
     'cancelBtn',
     'done',
     'doneTitle',
+    'doneIcon',
     'doneName',
+    'doneMeta',
     'doneDetail',
     'againBtn',
     'live',
@@ -472,20 +474,28 @@ function fail(err, context) {
   else ui.decGo.focus();
 }
 
-function finish({ title, name, detail }) {
+// notes: short sentences, one line each on a laptop.
+function finish({ title, icon, size, notes = [] }) {
+  const { name } = state.sink;
+  const meta = `${formatBytes(size)} · ${state.sink.mode === 'fs' ? 'Saved where you chose' : 'Saved to your downloads'}`;
   state.sink = null;
   state.controller = null;
   clearSecrets();
   ui.doneTitle.textContent = title;
+  setIcon(ui.doneIcon, icon);
   ui.doneName.textContent = name;
-  ui.doneDetail.textContent = detail;
+  ui.doneMeta.textContent = meta;
+  ui.doneDetail.replaceChildren(
+    ...notes.map((text) => {
+      const p = document.createElement('p');
+      p.textContent = text;
+      return p;
+    }),
+  );
   show('done');
   ui.doneTitle.focus();
-  announce(`${title}: ${name}. ${detail}`);
+  announce(`${title}: ${name}. ${meta}. ${notes.join(' ')}`);
 }
-
-const savedWhere = (sink) =>
-  sink.mode === 'fs' ? 'Saved where you chose.' : 'Saved by your browser, usually to the Downloads folder.';
 
 async function needsMemoryConfirm(bytes, run) {
   if (state.proceed === 'memory' || bytes <= MEMORY_WARN_BYTES || (await preferredMode()) !== 'blob') return false;
@@ -580,8 +590,9 @@ async function startEncrypt() {
     await state.sink.close();
     finish({
       title: 'Encrypted',
-      name: state.sink.name,
-      detail: `${savedWhere(state.sink)} Keep the password safe: without it, nobody can open this file, including you.`,
+      icon: 'i-vault',
+      size: outSize,
+      notes: ['Keep your password safe. Without it, no one can open this file.'],
     });
   } catch (err) {
     await state.sink?.abort();
@@ -638,11 +649,11 @@ async function saveDecrypted(progress = makeProgress('Decrypting')) {
     }
     signal.throwIfAborted();
     await state.sink.close();
-    const extra = [];
-    if (session.meta.type === 'zip')
-      extra.push(`It’s a ZIP archive with ${session.meta.count ?? 'several'} files. Open it to extract them.`);
-    if (session.warnings.length) extra.push('This file used an older VAULT format. Encrypt it again to upgrade it.');
-    finish({ title: 'Decrypted', name: state.sink.name, detail: [savedWhere(state.sink), ...extra].join(' ') });
+    const zip = session.meta.type === 'zip';
+    const notes = [];
+    if (zip) notes.push(`A ZIP archive with ${session.meta.count ?? 'several'} files. Open it to extract them.`);
+    if (session.warnings.length) notes.push('Made with an older VAULT format. Encrypt it again to upgrade it.');
+    finish({ title: 'Decrypted', icon: zip ? 'i-files' : 'i-file', size: session.meta.size, notes });
   } catch (err) {
     await state.sink?.abort();
     if (err?.name === 'SecurityError' || err?.name === 'NotAllowedError') {
@@ -723,6 +734,13 @@ function wire() {
 
   ui.encPwd.addEventListener('focus', ensureDictionaries, { once: true });
   ui.encPwd.addEventListener('input', updateEncryptFields);
+  // Tab goes from Password to Confirm; Shift+Tab from Confirm still reaches the
+  // generate and show buttons in between.
+  ui.encPwd.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab' || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || ui.confirmField.hidden) return;
+    e.preventDefault();
+    ui.encPwd2.focus();
+  });
   ui.encPwd2.addEventListener('input', () => updateConfirm());
   ui.encPwd2.addEventListener('blur', () => ui.encPwd2.value && updateConfirm(true));
   ui.encShow.addEventListener('click', () =>
