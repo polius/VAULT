@@ -13,4 +13,3 @@
 - [ ] Tests added or updated for the change
 - [ ] Format changes: new version, `FORMAT.md` updated, new vectors added, old vectors untouched
 - [ ] UI changes: checked with a keyboard and in light and dark themes
-- [ ] `CHANGELOG.md` updated under "Unreleased"
