@@ -93,6 +93,15 @@ test.describe('accessibility (axe, WCAG 2.1 AA)', () => {
   const axeSource = readFile(require.resolve('axe-core/axe.min.js'), 'utf8');
 
   async function audit(page) {
+    // Mid-animation opacity would read as low contrast.
+    await page.evaluate(() =>
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((a) => a.effect.getTiming().iterations !== Infinity)
+          .map((a) => a.finished),
+      ),
+    );
     await page.addScriptTag({ content: await axeSource });
     return page.evaluate(async () => {
       const r = await window.axe.run(document, {

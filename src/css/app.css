@@ -1165,6 +1165,27 @@ details[open] > summary::before {
   }
 }
 
+/* One entrance on first paint: the hero, then the card. Pure CSS, so it
+   never waits for the app's code. */
+@media (prefers-reduced-motion: no-preference) {
+  .intro,
+  .panel,
+  .how {
+    animation: enter 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  }
+  .panel,
+  .how {
+    animation-delay: 60ms;
+  }
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
