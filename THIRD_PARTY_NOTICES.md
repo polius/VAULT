@@ -8,6 +8,8 @@ VAULT includes the following third-party components. They are copied into `src/j
 | [EFF Large Wordlist](https://www.eff.org/dice)                               | Passphrase generator, strength estimate | CC BY 3.0 US | `src/js/vendor/eff-wordlist.js`     |
 | [SecLists](https://github.com/danielmiessler/SecLists) `10k-most-common.txt` | Strength estimate (common passwords)    | MIT          | `src/js/vendor/common-passwords.js` |
 
+The README video's build pipeline (`scripts/explainer`, not part of the app or the Docker image) bundles two fonts, both under the SIL Open Font License 1.1: [Inter](https://github.com/rsms/inter) and [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono). See `scripts/explainer/web/fonts/README.md`.
+
 ## hash-wasm
 
     MIT License

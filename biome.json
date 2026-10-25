@@ -2,7 +2,14 @@
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
-    "includes": ["**", "!src/js/vendor", "!test/vectors", "!**/package-lock.json", "!e2e/test-results"]
+    "includes": [
+      "**",
+      "!src/js/vendor",
+      "!test/vectors",
+      "!**/package-lock.json",
+      "!e2e/test-results",
+      "!scripts/explainer"
+    ]
   },
   "formatter": {
     "enabled": true,

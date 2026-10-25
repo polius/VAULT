@@ -23,6 +23,7 @@ A redesign of the app and a new file format. Files from VAULT 1.x still decrypt.
 - Specific error messages for a wrong password, a damaged file, a file from a newer version, and so on.
 - Over plain HTTP the page explains that it needs HTTPS instead of failing.
 - [FORMAT.md](FORMAT.md) specifies the file format, with test vectors in `test/vectors/`.
+- A one-minute video in the README shows VAULT at work. It is generated from code in `scripts/explainer`.
 
 ### Changed
 

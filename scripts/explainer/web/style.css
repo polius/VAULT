@@ -1,0 +1,378 @@
+/* VAULT video — stage styling.
+   Fixed 1920x1080; every animation is driven from JS by absolute time, so the
+   page is fully deterministic frame-by-frame (no CSS animations / transitions).
+   Soft light is drawn with radial gradients, never live blur filters: the
+   capture rasterizer would re-run a blur for every frame.
+
+   Colours are the app's own dark theme: blue locks (encrypt), green unlocks
+   (decrypt), the two halves of the shield. */
+
+@font-face {
+  font-family: "Inter";
+  src: url("fonts/Inter.ttf") format("truetype");
+  font-weight: 100 900;
+  font-display: block;
+}
+@font-face {
+  font-family: "JBMono";
+  src: url("fonts/JetBrainsMono.ttf") format("truetype");
+  font-weight: 100 800;
+  font-display: block;
+}
+
+:root {
+  --bg: #05080d;
+  --ink: #eef2f7;
+  --dim: #9aa4b2;
+  --faint: #5f6876;
+  --blue: #5b9bff;
+  --blue-l: #a8c8ff;
+  --green: #3ecf8e;
+  --green-l: #92e8c0;
+  --red: #ff7a6e;
+  --accent: #5b9bff;        /* driven per frame by the engine */
+  --accent-l: #a8c8ff;
+  --glass: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.022));
+  --line: rgba(255, 255, 255, 0.12);
+  --font: "Inter", system-ui, sans-serif;
+  --mono: "JBMono", ui-monospace, monospace;
+
+  /* the app, dark theme (src/css/app.css) */
+  --a-bg: #0d1117;
+  --a-surface: #161b22;
+  --a-surface-2: #1d232c;
+  --a-raised: #2a313c;
+  --a-ink: #e8ecf1;
+  --a-muted: #b0b8c4;
+  --a-faint: #8d96a3;
+  --a-line: #2b323c;
+  --a-line-strong: #3b4450;
+  --lock: #5b9bff;
+  --lock-soft: #15253f;
+  --unlock: #3ecf8e;
+  --unlock-soft: #10291f;
+  --on-accent: #08111f;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 1920px; height: 1080px; overflow: hidden;
+  background: #000;
+  font-family: var(--font);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+  font-feature-settings: "cv11", "ss03";
+}
+
+#stage { position: relative; width: 1920px; height: 1080px; background: var(--bg); overflow: hidden; }
+#scenes { position: absolute; inset: 0; }
+
+/* ---- persistent background ---------------------------------------------- */
+#bg { position: absolute; inset: 0; overflow: hidden; }
+#bg .glow {
+  position: absolute; left: 0; top: 0; width: 1700px; height: 1700px; border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 30%, transparent) 0%,
+    color-mix(in srgb, var(--accent) 9%, transparent) 32%, transparent 64%);
+}
+#bg .glow.g2 {
+  width: 1400px; height: 1400px;
+  background: radial-gradient(circle, rgba(62, 207, 142, 0.24) 0%, rgba(62, 207, 142, 0.07) 32%, transparent 64%);
+}
+/* the dial: concentric tick rings below the frame, only their tops show */
+#bg .dial { position: absolute; inset: 0; overflow: visible;
+  -webkit-mask-image: linear-gradient(180deg, transparent 8%, rgba(0,0,0,0.6) 45%, #000 85%); }
+#bg .dial circle { fill: none; stroke: rgb(170, 200, 255); }
+#bg .dust i {
+  position: absolute; left: 0; top: 0; width: 6px; height: 6px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(220,232,255,0.9), rgba(220,232,255,0) 70%);
+}
+#bg .vignette {
+  position: absolute; inset: 0;
+  background: radial-gradient(120% 115% at 50% 45%, transparent 45%, rgba(0,0,0,0.78) 100%);
+}
+
+/* a seam of light at 45 degrees, blue on one side and green on the other, as
+   the shield is split */
+#sweep {
+  position: absolute; top: -700px; left: 0; width: 460px; height: 2480px; z-index: 900;
+  background: linear-gradient(90deg, transparent, rgba(91, 155, 255, 0.10) 38%, rgba(235, 244, 255, 0.24) 50%,
+    rgba(62, 207, 142, 0.10) 62%, transparent);
+  transform: translateX(-800px) rotate(45deg); opacity: 0;
+}
+#blackout { position: absolute; inset: 0; background: #000; z-index: 999; }
+
+/* ---- scene layers ------------------------------------------------------- */
+.layer { position: absolute; inset: 0; transform-origin: 50% 50%; }
+.cam { position: absolute; inset: 0; transform-origin: 50% 50%; }
+.abs { position: absolute; }
+.ctr { position: absolute; transform: translate(-50%, -50%); }
+
+/* ---- type ---------------------------------------------------------------- */
+.headline {
+  font-weight: 750; font-size: 84px; line-height: 1.04; letter-spacing: -0.042em; white-space: nowrap;
+}
+.sub {
+  font-weight: 500; font-size: 38px; line-height: 1.3; letter-spacing: -0.015em; color: var(--dim); white-space: nowrap;
+}
+.grad .kt > span, .grad.solo {
+  background: linear-gradient(100deg, var(--blue-l) 0%, var(--blue) 45%, var(--green) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.grad-g .kt > span {
+  background: linear-gradient(100deg, var(--green-l) 0%, var(--green) 60%, #2fb37a 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* kinetic words: each word slides up out of its own mask */
+.kt { display: inline-block; overflow: hidden; vertical-align: top; padding: 0.06em 0.02em 0.14em; margin: -0.06em -0.02em -0.14em; }
+.kt > span { display: inline-block; will-change: transform; }
+
+/* ---- the lockup: shield + wordmark --------------------------------------- */
+.lockup { display: flex; align-items: center; gap: 0.42em; font-size: 150px; }
+.lockup .mark { width: 1.06em; height: 1.06em; flex: none; overflow: visible; }
+.lockup .word {
+  font-weight: 700; letter-spacing: 0.2em; margin-right: -0.2em; line-height: 1; color: #f4f7fb; white-space: nowrap;
+}
+.lockup .word span { display: inline-block; }
+
+/* ---- step captions (demo / decrypt) ---------------------------------------- */
+.steps { position: absolute; left: 96px; top: 50%; transform: translateY(-50%); display: grid; gap: 44px; }
+.step { display: grid; grid-template-columns: 74px auto; align-items: baseline; }
+.step .n { font-family: var(--mono); font-size: 30px; font-weight: 600; color: var(--accent-l); letter-spacing: 0.04em; }
+.step .t { font-weight: 750; font-size: 60px; line-height: 1.05; letter-spacing: -0.04em; white-space: nowrap; }
+.step .s { grid-column: 2; margin-top: 12px; font-size: 28px; font-weight: 500; color: var(--dim); letter-spacing: -0.01em; white-space: nowrap; }
+
+/* ---- the browser window ------------------------------------------------------- */
+.win {
+  position: absolute; border-radius: 22px; overflow: hidden; background: var(--a-bg);
+  border: 1.5px solid rgba(255,255,255,0.14);
+  box-shadow: 0 70px 140px -50px rgba(0,0,0,0.95), 0 0 0 1px rgba(0,0,0,0.6), inset 0 1.5px 0 rgba(255,255,255,0.08);
+}
+.win .chrome {
+  height: 60px; display: flex; align-items: center; gap: 11px; padding: 0 22px; position: relative; z-index: 3;
+  background: #12161d; border-bottom: 1.5px solid rgba(255,255,255,0.07);
+}
+.win .chrome i { width: 15px; height: 15px; border-radius: 50%; display: block; }
+.win .chrome i:nth-child(1) { background: #ff5f57; } .win .chrome i:nth-child(2) { background: #febc2e; } .win .chrome i:nth-child(3) { background: #28c840; }
+.win .url {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  display: flex; align-items: center; gap: 10px; padding: 8px 26px; border-radius: 10px;
+  background: rgba(255,255,255,0.055); font-size: 20px; color: var(--a-muted); white-space: nowrap;
+}
+.win .url svg { width: 17px; height: 17px; color: var(--a-faint); }
+.win .vp { position: absolute; left: 0; right: 0; top: 60px; bottom: 0; overflow: hidden;
+  background:
+    radial-gradient(42rem 26rem at 38% -6rem, rgb(91 155 255 / 11%), transparent 70%),
+    radial-gradient(42rem 26rem at 62% -6rem, rgb(62 207 142 / 7%), transparent 70%), var(--a-bg); }
+
+/* the app itself, at its own CSS sizes; the viewport zooms it */
+.app { position: absolute; left: 0; top: 0; width: 100%; color: var(--a-ink); font: 400 16px / 1.55 var(--font); transform-origin: 0 0; }
+.app .icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.app .icon-lg { width: 28px; height: 28px; }
+.app .topbar { display: flex; align-items: center; justify-content: space-between; padding: 20px 28px 0; }
+.app .brand { display: inline-flex; align-items: center; gap: 12px; }
+.app .brand svg { width: 34px; height: 34px; }
+.app .wordmark { font-weight: 700; font-size: 19px; letter-spacing: 0.2em; }
+.app .theme { display: flex; gap: 2px; padding: 4px; border: 1px solid var(--a-line); border-radius: 999px; font-size: 14px; color: var(--a-muted); }
+.app .theme span { padding: 5px 13px; border-radius: 999px; }
+.app .theme span:first-child { background: var(--a-raised); color: var(--a-ink); }
+.app .intro { text-align: center; margin: 40px 0 34px; display: grid; gap: 14px; }
+.app h1 { font-size: 46px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; }
+.app .lede { color: var(--a-muted); font-size: 18px; }
+.app .panel {
+  position: relative; margin: 0 auto; width: 640px; border-radius: 20px; overflow: hidden;
+  background: var(--a-surface); border: 1px solid var(--a-line);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 12px 32px -12px rgb(0 0 0 / 60%);
+}
+.app .state { position: absolute; left: 32px; right: 32px; top: 32px; display: grid; gap: 20px; }
+
+.app .dropzone {
+  display: grid; justify-items: center; gap: 8px; padding: 38px 24px 34px; text-align: center; color: var(--a-muted);
+  border: 1.5px dashed var(--a-line-strong); border-radius: 14px;
+}
+.app .dropzone.hot { border-color: var(--lock); background: var(--lock-soft); }
+.app .dropzone > .ico { width: 56px; height: 56px; border-radius: 999px; display: grid; place-items: center; color: var(--lock); background: var(--lock-soft); margin-bottom: 8px; }
+.app .dropzone .ttl { font-size: 19px; font-weight: 600; color: var(--a-ink); letter-spacing: -0.01em; }
+.app .dropzone .sub2 { font-size: 15px; }
+.app .btns { display: flex; gap: 12px; margin-top: 14px; }
+.app .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 46px; padding: 11px 20px;
+  border-radius: 12px; border: 1px solid transparent; font: 600 15px / 1.2 var(--font); white-space: nowrap;
+}
+.app .btn-primary { background: var(--lock); color: var(--on-accent); }
+.app .btn-unlock { background: var(--unlock); color: var(--on-accent); }
+.app .btn-secondary { background: var(--a-surface); color: var(--a-ink); border-color: var(--a-line-strong); }
+.app .btn-wide { width: 100%; min-height: 52px; font-size: 16px; }
+.app .btn-small { min-height: 36px; padding: 7px 13px; font-size: 14px; background: var(--a-surface); color: var(--a-ink); border-color: var(--a-line-strong); }
+
+.app .mode { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; gap: 4px; background: var(--a-surface-2); border-radius: 12px; position: relative; }
+.app .mode .pill { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 6px); border-radius: 9px; background: var(--a-raised); box-shadow: 0 1px 3px rgb(0 0 0 / 14%); }
+.app .mode span { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; font-weight: 600; color: var(--a-muted); }
+.app .selection {
+  display: flex; align-items: center; gap: 14px; padding: 14px 10px 14px 18px; border: 1px solid var(--a-line); border-radius: 14px;
+  background: color-mix(in srgb, var(--a-surface-2) 45%, transparent);
+}
+.app .selection .txt { flex: 1; display: grid; }
+.app .selection .nm { font-weight: 600; }
+.app .selection .mt, .app .muted { font-size: 14px; color: var(--a-muted); }
+.app .selection .x { width: 40px; height: 40px; display: grid; place-items: center; color: var(--a-muted); }
+.app .field { display: grid; gap: 10px; }
+.app .lbl { font-weight: 600; font-size: 15px; }
+.app .input {
+  display: flex; align-items: center; border: 1px solid var(--a-line-strong); border-radius: 12px; background: var(--a-surface); height: 50px;
+}
+.app .input.focus { border-color: var(--focus, var(--lock)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus, var(--lock)) 25%, transparent); }
+.app .input .val { flex: 1; padding: 0 16px; font-family: var(--mono); font-size: 15px; white-space: nowrap; overflow: hidden; }
+.app .input .val.dots { font-family: var(--font); font-size: 20px; letter-spacing: 0.12em; }
+.app .input .ib { width: 46px; height: 48px; display: grid; place-items: center; color: var(--a-muted); }
+.app .meter { display: flex; align-items: center; gap: 14px; font-size: 14px; color: var(--a-muted); }
+.app .meter .bars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; width: 120px; }
+.app .meter .bars i { height: 6px; border-radius: 3px; background: var(--a-line); }
+.app .meter b { color: var(--a-ink); font-weight: 600; }
+.app .generated {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; padding: 16px 16px 16px 18px;
+  background: var(--lock-soft); border-radius: 14px; font-size: 14px; line-height: 1.5;
+}
+.app .generated > .icon { color: var(--lock); }
+.app .opts { font-weight: 600; font-size: 15px; color: var(--a-muted); display: flex; align-items: center; gap: 8px; }
+.app .opts .icon { width: 16px; height: 16px; }
+.app .vinfo { font-size: 14px; color: var(--a-muted); }
+
+.app .work-head { display: flex; justify-content: space-between; font-weight: 600; font-variant-numeric: tabular-nums; }
+.app .progress { height: 8px; border-radius: 999px; background: var(--a-surface-2); overflow: hidden; }
+.app .progress b { display: block; height: 100%; border-radius: inherit; background: var(--lock); }
+.app .work-stats { font-size: 14px; color: var(--a-muted); font-variant-numeric: tabular-nums; }
+
+.app .done { justify-items: center; text-align: center; }
+.app .badge { width: 56px; height: 56px; border-radius: 999px; display: grid; place-items: center; color: var(--unlock); background: var(--unlock-soft); }
+.app .done h2 { font-size: 24px; letter-spacing: -0.015em; margin-top: -6px; }
+.app .done-file {
+  display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 18px 14px 14px; text-align: left;
+  border: 1px solid var(--a-line); border-radius: 12px; background: color-mix(in srgb, var(--a-surface-2) 45%, transparent);
+}
+.app .done-file .fi { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; color: var(--accent2, var(--lock)); background: var(--accent2-soft, var(--lock-soft)); }
+.app .done-file .nm { font-size: 17px; font-weight: 600; line-height: 1.35; }
+.app .done .note { font-size: 14px; color: var(--a-muted); }
+
+/* the drop overlay and the dragged file */
+.app-overlay { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; background: color-mix(in srgb, var(--a-bg) 70%, transparent); }
+.app-overlay .card {
+  display: flex; align-items: center; gap: 14px; padding: 22px 34px; border-radius: 18px; font-size: 22px; font-weight: 600;
+  border: 2px dashed var(--accent); background: var(--a-surface); color: var(--a-ink);
+}
+.app-overlay .card .icon { width: 30px; height: 30px; color: var(--accent); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.dragfile {
+  display: flex; align-items: center; gap: 16px; padding: 16px 26px 16px 18px; border-radius: 18px; white-space: nowrap;
+  background: rgba(30, 36, 46, 0.96); border: 1.5px solid rgba(255,255,255,0.16); font-size: 26px; font-weight: 600;
+  box-shadow: 0 40px 80px -30px rgba(0,0,0,0.9);
+}
+.dragfile .fi { width: 54px; height: 54px; border-radius: 13px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-l); }
+.dragfile .fi svg { width: 32px; height: 32px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.dragfile small { display: block; font-size: 19px; font-weight: 500; color: var(--dim); }
+
+.cursor { position: absolute; left: 0; top: 0; width: 44px; height: 44px; z-index: 50; pointer-events: none; }
+.ripple { position: absolute; width: 70px; height: 70px; margin: -35px 0 0 -35px; border-radius: 50%; border: 3px solid var(--accent-l); z-index: 49; }
+
+/* ---- glass card + small labels ---------------------------------------------- */
+.glass {
+  background: var(--glass);
+  border: 1.5px solid var(--line);
+  border-radius: 28px;
+  box-shadow: 0 40px 90px -40px rgba(0,0,0,0.9), inset 0 1.5px 0 rgba(255,255,255,0.10);
+}
+.label { font-size: 27px; font-weight: 600; color: var(--ink); white-space: nowrap; letter-spacing: -0.01em; }
+.mlabel { font-family: var(--mono); font-size: 22px; font-weight: 500; color: var(--dim); white-space: nowrap; }
+.chip {
+  display: inline-flex; align-items: center; gap: 14px; padding: 16px 26px; border-radius: 18px; white-space: nowrap;
+  font-family: var(--mono); font-size: 27px; color: var(--ink);
+  background: rgba(255,255,255,0.05); border: 1.5px solid rgba(255,255,255,0.13);
+}
+
+/* ---- LOCAL: the device and what never reaches it --------------------------- */
+.node { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.node .card { display: grid; place-items: center; width: 150px; height: 150px; border-radius: 36px; }
+.node .card svg { width: 72px; height: 72px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.node .card { color: var(--dim); }
+.no { font-weight: 750; font-size: 48px; letter-spacing: -0.03em; white-space: nowrap; }
+.device { position: absolute; transform: translate(-50%, -50%); }
+
+/* ---- INSIDE: the pipeline ---------------------------------------------------- */
+.box {
+  display: grid; justify-items: center; gap: 14px; padding: 28px 34px; text-align: center;
+}
+.box .ttl { font-weight: 750; font-size: 44px; letter-spacing: -0.03em; white-space: nowrap; }
+.box .ttl.mono { font-family: var(--mono); font-weight: 700; letter-spacing: 0; }
+.box .mt { font-family: var(--mono); font-size: 21px; color: var(--dim); white-space: nowrap; letter-spacing: 0.02em; }
+.memgrid { display: grid; grid-template-columns: repeat(12, 18px); gap: 6px; }
+.memgrid i { width: 18px; height: 18px; border-radius: 4px; background: rgba(255,255,255,0.08); }
+.piece {
+  position: absolute; width: 104px; height: 128px; border-radius: 16px; transform: translate(-50%, -50%);
+  display: grid; place-items: center; font-family: var(--mono); font-size: 16px; color: var(--dim);
+  background: rgba(255,255,255,0.045); border: 1.5px solid rgba(255,255,255,0.13);
+}
+.piece .lk { position: absolute; width: 50px; height: 50px; display: grid; place-items: center; border-radius: 14px; background: var(--accent); color: #08111f; }
+.piece .lk svg, .vfile svg, .dest svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.piece .idx { position: absolute; bottom: 10px; font-size: 15px; color: var(--faint); }
+.piece .hx { font-size: 13px; line-height: 1.45; color: rgba(255,255,255,0.32); text-align: center; white-space: pre; }
+
+/* ---- SHARE ------------------------------------------------------------------- */
+.vfile { display: flex; align-items: center; gap: 22px; padding: 26px 36px 26px 26px; border-radius: 26px; white-space: nowrap; }
+.vfile .fi { width: 84px; height: 84px; border-radius: 22px; display: grid; place-items: center; color: var(--accent-l); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.vfile .nm { font-size: 36px; font-weight: 650; letter-spacing: -0.02em; }
+.vfile .mt { font-size: 24px; color: var(--dim); margin-top: 4px; }
+.dest { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.dest .card { width: 150px; height: 150px; border-radius: 36px; display: grid; place-items: center; color: var(--ink); }
+.noise { position: absolute; font-family: var(--mono); font-size: 25px; line-height: 1.5; letter-spacing: 0.06em; color: rgba(168, 200, 255, 0.5); white-space: pre; }
+
+/* ---- terminal (self-host) ------------------------------------------------------ */
+.term {
+  position: absolute; border-radius: 22px; overflow: hidden;
+  background: linear-gradient(180deg, rgba(20, 24, 31, 0.95), rgba(11, 13, 18, 0.97));
+  border: 1.5px solid rgba(255,255,255,0.13);
+  box-shadow: 0 60px 120px -50px rgba(0,0,0,0.95), 0 0 0 1px rgba(0,0,0,0.6), inset 0 1.5px 0 rgba(255,255,255,0.09);
+}
+.term .tb {
+  height: 58px; display: flex; align-items: center; gap: 11px; padding: 0 22px;
+  background: rgba(255,255,255,0.035); border-bottom: 1.5px solid rgba(255,255,255,0.07);
+}
+.term .tb i { width: 16px; height: 16px; border-radius: 50%; display: block; }
+.term .tb i:nth-child(1) { background: #ff5f57; } .term .tb i:nth-child(2) { background: #febc2e; } .term .tb i:nth-child(3) { background: #28c840; }
+.term .tb .ttl { flex: 1; text-align: center; margin-right: 70px; font-size: 21px; font-weight: 550; color: var(--faint); }
+.term .body { padding: 26px 32px; font-family: var(--mono); font-size: 27px; line-height: 1.6; color: var(--ink); }
+.term .ln { white-space: pre; min-height: 1.6em; }
+.term .p { color: var(--green); font-weight: 600; }
+.term .d { color: var(--dim); }
+.term .f { color: var(--faint); }
+.term .a { color: var(--blue-l); }
+.term .caret { display: inline-block; width: 0.6em; height: 1.1em; vertical-align: -0.18em; background: var(--ink); margin-left: 2px; }
+
+/* ---- outro ------------------------------------------------------------------------ */
+.try {
+  display: flex; align-items: center; gap: 18px; padding: 22px 40px; border-radius: 999px; white-space: nowrap;
+  font-size: 38px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink);
+  background: rgba(255,255,255,0.05); border: 1.5px solid rgba(255,255,255,0.14);
+  box-shadow: 0 40px 90px -40px rgba(0,0,0,0.9), inset 0 1.5px 0 rgba(255,255,255,0.08);
+}
+.try svg { width: 30px; height: 30px; color: var(--green); fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.url { font-family: var(--mono); font-size: 28px; color: var(--dim); white-space: nowrap; letter-spacing: 0.02em; }
+.url b { color: var(--blue); font-weight: 400; margin: 0 18px; }
+
+/* ---- poster affordance (README thumbnail only, never in the video) ------- */
+#poster-play {
+  --d: 150px; --y: 496px;
+  position: absolute; inset: 0; z-index: 1000; background: rgba(3, 6, 10, 0.16);
+}
+#poster-play::before {
+  content: ""; position: absolute; left: 50%; top: var(--y); width: var(--d); height: var(--d);
+  margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2);
+  border-radius: 50%; background: rgba(91, 155, 255, 0.96);
+  box-shadow: 0 calc(var(--d) * 0.2) calc(var(--d) * 0.53) calc(var(--d) * -0.07) rgba(0,0,0,0.7),
+              0 0 0 calc(var(--d) * 0.067) rgba(91,155,255,0.22);
+}
+#poster-play::after {
+  content: ""; position: absolute; left: calc(50% - var(--d) * 0.113); top: calc(var(--y) - var(--d) * 0.2);
+  border-left: calc(var(--d) * 0.333) solid #fff;
+  border-top: calc(var(--d) * 0.2) solid transparent; border-bottom: calc(var(--d) * 0.2) solid transparent;
+}
