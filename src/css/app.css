@@ -108,7 +108,7 @@ html {
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   background:
@@ -194,7 +194,7 @@ code {
   width: 100%;
   max-width: 1040px;
   margin: 0 auto;
-  padding: 22px max(24px, env(safe-area-inset-right)) 0 max(24px, env(safe-area-inset-left));
+  padding: 20px max(24px, env(safe-area-inset-right)) 0 max(24px, env(safe-area-inset-left));
 }
 
 .brand {
@@ -291,9 +291,10 @@ code {
   width: 100%;
   max-width: 768px;
   margin: 0 auto;
-  padding: clamp(48px, 9vh, 88px) max(24px, env(safe-area-inset-right)) 32px max(24px, env(safe-area-inset-left));
+  padding: clamp(24px, 6vh, 72px) max(24px, env(safe-area-inset-right)) clamp(8px, 2vh, 24px)
+    max(24px, env(safe-area-inset-left));
   display: grid;
-  gap: 40px;
+  gap: clamp(24px, 4.5vh, 40px);
   align-content: start;
 }
 
@@ -306,7 +307,7 @@ code {
 
 .intro {
   display: grid;
-  gap: clamp(18px, 2.6vw, 24px);
+  gap: clamp(14px, 2.4vh, 22px);
   text-align: center;
 }
 
@@ -329,7 +330,7 @@ h1 {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   border: 1px solid var(--line);
-  padding: 36px;
+  padding: clamp(24px, 4.2vh, 36px);
 }
 
 /* ---------- pick ---------- */
@@ -338,7 +339,7 @@ h1 {
   display: grid;
   justify-items: center;
   gap: 8px;
-  padding: 48px 24px 44px;
+  padding: clamp(28px, 5vh, 44px) 24px clamp(28px, 4.6vh, 40px);
   border: 1.5px dashed var(--line-strong);
   border-radius: 14px;
   text-align: center;
@@ -359,8 +360,8 @@ body.dragging .dropzone {
   box-sizing: content-box;
   width: 28px;
   height: 28px;
-  padding: 16px;
-  margin-bottom: 12px;
+  padding: 14px;
+  margin-bottom: 8px;
   border-radius: 999px;
   color: var(--lock);
   background: var(--lock-soft);
@@ -396,7 +397,7 @@ body.dragging .dropzone {
   flex-wrap: wrap;
   justify-content: center;
   gap: 12px;
-  margin-top: 20px;
+  margin-top: 16px;
 }
 
 /* ---------- buttons ---------- */
@@ -985,7 +986,7 @@ details[open] > summary::before {
 /* ---------- how / footer ---------- */
 
 .how {
-  margin-top: -8px;
+  margin-top: -12px;
   padding: 0 4px;
   color: var(--muted);
   font-size: 15px;
@@ -1018,8 +1019,8 @@ details[open] > summary::before {
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px 28px;
-  padding: 40px max(24px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom))
-    max(24px, env(safe-area-inset-left));
+  padding: clamp(16px, 3vh, 32px) max(24px, env(safe-area-inset-right))
+    max(clamp(16px, 3vh, 28px), env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
   font-size: 14px;
 }
 
@@ -1038,8 +1039,8 @@ details[open] > summary::before {
     padding-inline: 16px;
   }
   .page {
-    padding: 36px 16px 24px;
-    gap: 28px;
+    padding: clamp(20px, 4vh, 36px) 16px 16px;
+    gap: clamp(20px, 3.4vh, 28px);
   }
   .panel {
     padding: 20px;
@@ -1058,6 +1059,43 @@ details[open] > summary::before {
   }
   .generated .btn {
     grid-column: 1 / -1;
+  }
+}
+
+/* Short viewports (small laptops, phones with browser bars): keep the landing view on one screen. */
+@media (max-height: 720px) {
+  h1 {
+    font-size: clamp(28px, 4.6vw, 40px);
+  }
+  .dropzone > .icon {
+    width: 24px;
+    height: 24px;
+    padding: 12px;
+  }
+  .dropzone-title {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 520px) and (max-height: 720px) {
+  .topbar {
+    padding-top: 12px;
+  }
+  .page {
+    padding-top: clamp(14px, 3vh, 24px);
+  }
+  .dropzone {
+    padding-block: 22px;
+  }
+  .pick-buttons .btn {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 520px) {
+  .footer {
+    gap: 8px 20px;
+    font-size: 13px;
   }
 }
 
