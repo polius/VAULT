@@ -94,19 +94,6 @@ There is no password recovery. If you lose the password, the data is gone.
 
 In short: everything happens in your browser, and nothing you drop on the page is sent anywhere. The server only delivers static files, and the page's Content-Security-Policy forbids it from connecting anywhere but its own origin. VAULT protects your files at rest and in transit; it can't protect against a compromised device or browser, or against a server that's been changed to deliver malicious code. Read [SECURITY.md](SECURITY.md) for the details and for how to report a vulnerability.
 
-## Development
-
-Requires Node.js 22 or later. No build step: `src/` is served as is.
-
-```bash
-npm ci
-npm run serve      # http://127.0.0.1:8080 with production headers
-npm test           # unit tests
-npm run lint       # Biome
-```
-
-End-to-end tests run in Chromium, Firefox and WebKit with Playwright. See [CONTRIBUTING.md](CONTRIBUTING.md).
-
 ## License
 
 [MIT](LICENSE). Third-party components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
