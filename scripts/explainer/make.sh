@@ -4,7 +4,7 @@
 #   ./make.sh                       # full build -> vault-video.mp4
 #   ./make.sh --skip-capture        # re-encode from frames/ on disk
 #   ./make.sh --skip-narration      # keep audio/ + timeline.json
-#   ./make.sh --poster 13.9         # just rewrite docs/assets/video-poster.png
+#   ./make.sh --poster 6.6          # just rewrite docs/assets/video-poster.png
 #   ./make.sh --workers 4 --crf 16
 set -euo pipefail
 cd "$(dirname "$0")"

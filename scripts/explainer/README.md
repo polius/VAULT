@@ -112,7 +112,7 @@ To look at stills while iterating on the visuals (fast, 1×, no encode):
 To regenerate the README thumbnail:
 
 ```sh
-./make.sh --poster 13.9                               # -> docs/assets/video-poster.png
+./make.sh --poster 6.6                                # -> docs/assets/video-poster.png
 ```
 
 ---

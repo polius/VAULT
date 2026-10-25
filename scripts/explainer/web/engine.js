@@ -254,5 +254,16 @@
   window.__render = render;
   window.__cues = () => CUES;
   window.__duration = () => (TL ? TL.d.video_end : 0);
-  window.__poster = function () { el("div", "", document.getElementById("stage")).id = "poster-play"; };
+  window.__poster = function () {
+    // a still can afford one continuous gradient per line (the video paints it per word)
+    document.querySelectorAll(".grad").forEach((line) => {
+      const lr = line.getBoundingClientRect();
+      line.querySelectorAll(".kt > span").forEach((w) => {
+        const r = w.getBoundingClientRect();
+        w.style.backgroundSize = `${lr.width.toFixed(1)}px 100%`;
+        w.style.backgroundPosition = `${(lr.left - r.left).toFixed(1)}px 0`;
+      });
+    });
+    el("div", "", document.getElementById("stage")).id = "poster-play";
+  };
 })();

@@ -360,11 +360,12 @@ html, body {
 .url b { color: var(--blue); font-weight: 400; margin: 0 18px; }
 
 /* ---- poster affordance (README thumbnail only, never in the video) -------
-   Placed for the poster frame (./make.sh --poster 13.9): under the step
-   captions, clear of the app. */
+   Placed for the poster frame (./make.sh --poster 6.6): centred, between the
+   name and the promise. */
 #poster-play {
-  --d: 150px; --x: 245px; --y: 772px;
-  position: absolute; inset: 0; z-index: 1000; background: rgba(3, 6, 10, 0.16);
+  --d: 150px; --x: 50%; --y: 494px;
+  position: absolute; inset: 0; z-index: 1000;
+  background: radial-gradient(130px circle at var(--x) var(--y), rgba(3, 6, 10, 0.45), transparent);
 }
 #poster-play::before {
   content: ""; position: absolute; left: var(--x); top: var(--y); width: var(--d); height: var(--d);
