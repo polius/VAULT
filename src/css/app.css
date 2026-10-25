@@ -200,15 +200,20 @@ code {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   color: var(--ink);
   text-decoration: none;
 }
 
+.brand img {
+  width: 36px;
+  height: 36px;
+}
+
 .wordmark {
-  font-weight: 650;
-  font-size: 16px;
-  letter-spacing: 0.24em;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.2em;
 }
 
 .topbar-end {
@@ -1037,6 +1042,17 @@ details[open] > summary::before {
 @media (max-width: 520px) {
   .topbar {
     padding-inline: 16px;
+  }
+  .brand {
+    gap: 10px;
+  }
+  .brand img {
+    width: 30px;
+    height: 30px;
+  }
+  .wordmark {
+    font-size: 17px;
+    letter-spacing: 0.16em;
   }
   .page {
     padding: clamp(20px, 4vh, 36px) 16px 16px;
