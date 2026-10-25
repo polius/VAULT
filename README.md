@@ -14,20 +14,8 @@ _All processing happens **<span style="color: #ffad32">locally</span>** on your 
 
 <br>
 
-![VAULT](src/assets/screenshot.png)
+<a href="https://vault.alzina.dev/video.mp4"><img src="docs/assets/video-poster.png" alt="Watch the VAULT video: a one-minute walkthrough of encrypting and decrypting a file"></a>
 </div>
-
-## See it in action
-
-<p align="center">
-  <a href="https://vault.alzina.dev/video.mp4">
-    <img src="docs/assets/video-poster.png" width="720"
-      alt="Watch the VAULT video: a one-minute walkthrough of encrypting and decrypting a file">
-  </a>
-</p>
-
-<p align="center"><em>One minute: encrypting a file, what happens under the hood, and getting it back.
-Plays as an MP4 in your browser. The video is built from code in <a href="scripts/explainer">scripts/explainer</a>.</em></p>
 
 ## Features
 

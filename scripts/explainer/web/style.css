@@ -359,20 +359,22 @@ html, body {
 .url { font-family: var(--mono); font-size: 28px; color: var(--dim); white-space: nowrap; letter-spacing: 0.02em; }
 .url b { color: var(--blue); font-weight: 400; margin: 0 18px; }
 
-/* ---- poster affordance (README thumbnail only, never in the video) ------- */
+/* ---- poster affordance (README thumbnail only, never in the video) -------
+   Placed for the poster frame (./make.sh --poster 13.9): under the step
+   captions, clear of the app. */
 #poster-play {
-  --d: 150px; --y: 496px;
+  --d: 150px; --x: 245px; --y: 772px;
   position: absolute; inset: 0; z-index: 1000; background: rgba(3, 6, 10, 0.16);
 }
 #poster-play::before {
-  content: ""; position: absolute; left: 50%; top: var(--y); width: var(--d); height: var(--d);
+  content: ""; position: absolute; left: var(--x); top: var(--y); width: var(--d); height: var(--d);
   margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2);
   border-radius: 50%; background: rgba(91, 155, 255, 0.96);
   box-shadow: 0 calc(var(--d) * 0.2) calc(var(--d) * 0.53) calc(var(--d) * -0.07) rgba(0,0,0,0.7),
               0 0 0 calc(var(--d) * 0.067) rgba(91,155,255,0.22);
 }
 #poster-play::after {
-  content: ""; position: absolute; left: calc(50% - var(--d) * 0.113); top: calc(var(--y) - var(--d) * 0.2);
+  content: ""; position: absolute; left: calc(var(--x) - var(--d) * 0.113); top: calc(var(--y) - var(--d) * 0.2);
   border-left: calc(var(--d) * 0.333) solid #fff;
   border-top: calc(var(--d) * 0.2) solid transparent; border-bottom: calc(var(--d) * 0.2) solid transparent;
 }
