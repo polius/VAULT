@@ -1,4 +1,6 @@
+# Replace yourdomain.com with your domain. Caddy gets and renews the TLS
+# certificate automatically.
 yourdomain.com {
-	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
-	reverse_proxy vault:80
+	header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+	reverse_proxy vault:8080
 }

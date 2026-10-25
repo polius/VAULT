@@ -4,52 +4,85 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
 
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  test:
-    name: Node tests
+  lint:
+    name: Lint and vendored files
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v7
-
-      - name: Set up Node
-        uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Biome
+        run: npm run lint
+      - name: Vendored files match their pinned sources
+        run: npm run vendor:check
 
-      - name: Run test suite
-        run: npm test
-
-  # End-to-end smoke: real Chromium against the real container. Round-trips a
-  # random file through encrypt -> decrypt via each sink (sw, fs, blob) and
-  # verifies SHA-256 equality.
-  e2e-smoke:
-    name: E2E smoke (chromium, sw/fs/blob)
+  unit:
+    name: Unit tests (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24]
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
 
-      - name: Build image and start container
+  e2e:
+    name: E2E (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build the image and run it hardened, as in production
         run: |
           docker build -t vault:e2e .
-          docker run -d --name vault-e2e -p 127.0.0.1:8080:80 vault:e2e
+          docker run -d --name vault-e2e --read-only --tmpfs /tmp --cap-drop ALL \
+            --security-opt no-new-privileges:true -p 127.0.0.1:8080:8080 vault:e2e
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/ >/dev/null && break; sleep 1; done
 
-      - name: Set up Node
-        uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
 
-      - name: Run e2e cells
+      - name: Run Playwright
         working-directory: e2e
+        env:
+          BASE_URL: http://127.0.0.1:8080
         run: |
           npm ci
-          npx playwright install --with-deps chromium
-          node run.mjs --base-url=http://127.0.0.1:8080 --size=16M
+          npx playwright install --with-deps ${{ matrix.browser }}
+          npx playwright test --project=${{ matrix.browser }}
+
+      - name: Upload traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-${{ matrix.browser }}
+          path: e2e/test-results
+          retention-days: 7
 
       - name: Teardown
         if: always()
