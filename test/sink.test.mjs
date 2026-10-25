@@ -1,6 +1,6 @@
 // Sinks, run against the REAL src/sw.js in a stubbed ServiceWorkerGlobalScope.
-// Covers backpressure (audit M6), cancel/abort in both directions, the Firefox
-// fetch-after-end ordering, headers, and the fs -> sw -> blob fallback chain.
+// Covers backpressure (audit M6), cancel/abort in both directions, late and
+// missing fetches (Firefox), headers, and the fs -> sw -> blob fallback chain.
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { concat, randU8 } from './helpers.mjs';
@@ -148,19 +148,36 @@ describe('Service Worker sink', () => {
     await assert.rejects(readAll(res));
   });
 
-  it('serves a transfer whose fetch arrives after the end (Firefox ordering)', async () => {
+  it('waits for a late fetch before writing (Firefox ordering)', async () => {
     autoFetch = false;
     try {
-      const sink = await openSink({ name: 'late.bin', size: 3000 });
+      const opening = openSink({ name: 'late.bin', size: 3000 });
+      await tick(100);
+      pendingFetches.shift()();
+      const sink = await opening;
+      assert.equal(sink.mode, 'sw');
       const data = randU8(3000);
       await sink.write(data.subarray(0, 1000));
       await sink.write(data.subarray(1000));
       await sink.close();
-      pendingFetches.shift()();
       const body = await readAll(await responses.at(-1));
       assert.ok(Buffer.from(body).equals(Buffer.from(data)));
     } finally {
       autoFetch = true;
+    }
+  });
+
+  it('falls back to blob, and stays there, when the browser skips the worker', async (t) => {
+    t.mock.method(console, 'warn', () => {});
+    autoFetch = false;
+    try {
+      const sink = await openSink({ name: 'bypass.bin', size: 2 });
+      assert.equal(sink.mode, 'blob');
+      assert.equal(await preferredMode(), 'blob');
+      pendingFetches.length = 0;
+    } finally {
+      autoFetch = true;
+      sinkState.swBypassed = false;
     }
   });
 

@@ -6,7 +6,10 @@
 // { type: 'pull' } whenever the stream wants another chunk, and the page sends
 // exactly one ArrayBuffer per pull. { type: 'end' } closes the stream,
 // { type: 'abort' } errors it (the browser then marks the download failed), and
-// if the user cancels the download the page receives { type: 'cancel' }.
+// if the user cancels the download the page receives { type: 'cancel' }. When
+// the request arrives the worker posts { type: 'start' }: some browsers skip
+// the worker (Firefox after a forced reload, or with DevTools' cache disabled),
+// and the page uses another sink if it never hears this.
 //
 // The entry stays in the map after 'end': Firefox can dispatch the iframe's
 // fetch after a small file has already been fully streamed. `served` stops a
@@ -68,7 +71,7 @@ self.addEventListener('message', (event) => {
     settle();
   };
 
-  transfers.set(id, { name, size, mime: mime || 'application/octet-stream', stream, createdAt: Date.now() });
+  transfers.set(id, { name, size, mime: mime || 'application/octet-stream', stream, port, createdAt: Date.now() });
   port.postMessage({ type: 'ready' });
 });
 
@@ -88,6 +91,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   entry.served = true;
+  entry.port.postMessage({ type: 'start' });
   const headers = new Headers({
     'Content-Type': entry.mime,
     'Content-Disposition': contentDisposition(entry.name),

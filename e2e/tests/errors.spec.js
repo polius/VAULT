@@ -151,6 +151,40 @@ test.describe('cancel', () => {
   }
 });
 
+test('a download the browser sends past the Service Worker falls back instead of hanging', async ({
+  page,
+  work,
+  problems,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'uses the DevTools protocol to bypass the worker');
+  await page.addInitScript(() => {
+    delete window.showSaveFilePicker;
+  });
+  await openApp(page);
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null, null, { timeout: 20_000 });
+  // What Firefox does after a forced reload or with DevTools' cache disabled.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Network.enable');
+  await cdp.send('Network.setBypassServiceWorker', { bypass: true });
+
+  const src = await makeFile(work, 'notes.txt', 50_000);
+  await pick(page, src.path);
+  const enc = await capture(page, 'blob', null, () => encrypt(page, STRONG), work, 'n.vault');
+  expect(enc.name).toBe('notes.txt.vault');
+  await expect(page.locator('#doneTitle')).toHaveText('Encrypted');
+
+  const file = path.join(work, 'notes.txt.vault');
+  await writeFile(file, enc.bytes);
+  await page.click('#againBtn');
+  await pick(page, file);
+  const dec = await capture(page, 'blob', null, () => decrypt(page, STRONG), work, 'n.txt');
+  expect(dec.bytes.equals(src.data)).toBe(true);
+  // The server answers the skipped request with a 404, once.
+  expect(problems).toEqual([expect.stringMatching(/404/)]);
+  problems.length = 0;
+});
+
 test('dismissing the save dialog cancels cleanly', async ({ page, work, problems }) => {
   await page.addInitScript(() => {
     window.showSaveFilePicker = async () => {

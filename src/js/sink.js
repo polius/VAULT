@@ -18,6 +18,7 @@ import { scriptURL } from './tt.js';
 const MODES = ['fs', 'sw', 'blob'];
 const SW_READY_TIMEOUT_MS = 4000;
 const SW_HANDSHAKE_TIMEOUT_MS = 5000;
+const SW_START_TIMEOUT_MS = 5000;
 const SW_KEEPALIVE_MS = 10_000;
 
 // Testing override: ?sink=fs|sw|blob forces a mode for one page load.
@@ -32,11 +33,13 @@ function readOverride() {
 
 const secure = () => globalThis.isSecureContext === true;
 const hasFs = () => typeof globalThis.showSaveFilePicker === 'function' && secure();
-const hasSw = () => typeof navigator !== 'undefined' && 'serviceWorker' in navigator && secure();
+const hasSw = () =>
+  typeof navigator !== 'undefined' && 'serviceWorker' in navigator && secure() && !sinkState.swBypassed;
 
 export const sinkState = {
   forced: readOverride(),
   registration: null,
+  swBypassed: false, // the browser sent a download past the worker; don't try again
   ready: null, // Promise<ServiceWorkerRegistration|null>, set by registerServiceWorker()
 };
 
@@ -141,8 +144,13 @@ async function openSwSink({ name, size, mime }) {
     handshake = resolve;
     timer = setTimeout(() => reject(new Error('Service Worker did not respond')), SW_HANDSHAKE_TIMEOUT_MS);
   }).finally(() => clearTimeout(timer));
+  let start;
+  const started = new Promise((resolve) => {
+    start = resolve;
+  });
   port.onmessage = ({ data }) => {
     if (data?.type === 'ready') handshake();
+    else if (data?.type === 'start') start(true);
     else if (data?.type === 'pull') credits++;
     else if (data?.type === 'cancel') {
       failure = new DOMException('The download was cancelled', 'AbortError');
@@ -166,6 +174,17 @@ async function openSwSink({ name, size, mime }) {
     clearInterval(keepalive);
     setTimeout(() => iframe.remove(), 30_000);
   };
+
+  // If the browser sent the request past the worker (the server then answers
+  // 404), nothing would ever pull: give up so openSink() tries the next sink.
+  if (!(await Promise.race([started, new Promise((r) => setTimeout(() => r(false), SW_START_TIMEOUT_MS))]))) {
+    clearInterval(keepalive);
+    iframe.remove();
+    port.postMessage({ type: 'abort' });
+    port.close();
+    sinkState.swBypassed = true;
+    throw new Error('The browser did not send the download through the Service Worker');
+  }
 
   return {
     mode: 'sw',
