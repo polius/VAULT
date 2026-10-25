@@ -1,20 +1,19 @@
 <div align="center">
-<img src="src/assets/logo.svg" alt="VAULT Logo" width="45">
+<img src="src/assets/logo.svg" alt="" width="45">
 <h1 align="center">VAULT</h1>
 
-**Securely <span style="color: #0d6dfd">encrypt</span> and <span style="color: #198754">decrypt</span> your files directly in your browser**
+**Encrypt files locally.** Lock any file or folder with a password, right in your browser.<br>
+Nothing is ever uploaded.
 
 <p align="center">
-<a href="https://github.com/polius/vault/actions/workflows/release.yml"><img src="https://github.com/polius/vault/actions/workflows/release.yml/badge.svg"></a>&nbsp;<a href="https://github.com/polius/vault/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/polius/vault"></a>&nbsp;<a href="https://hub.docker.com/r/poliuscorp/vault"><img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/poliuscorp/vault"></a>
+<a href="https://github.com/polius/vault/actions/workflows/release.yml"><img alt="Release workflow" src="https://github.com/polius/vault/actions/workflows/release.yml/badge.svg"></a>&nbsp;<a href="https://github.com/polius/vault/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/polius/vault"></a>&nbsp;<a href="https://hub.docker.com/r/poliuscorp/vault"><img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/poliuscorp/vault"></a>
 </p>
 
-<br>
-
-_All processing happens **<span style="color: #ffad32">locally</span>** on your device — no uploads, no servers involved._
-
-<br>
-
 <a href="https://vault.alzina.dev/video.mp4"><img src="docs/assets/video-poster.png" alt="Watch the VAULT video: a one-minute walkthrough of encrypting and decrypting a file"></a>
+
+<p align="center">
+<a href="https://vault.alzina.dev"><b>Try it at vault.alzina.dev</b></a> · <a href="#installation">Self-host</a> · <a href="#security-model">How it's secured</a>
+</p>
 </div>
 
 ## Features
