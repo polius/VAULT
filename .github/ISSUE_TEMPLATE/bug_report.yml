@@ -29,7 +29,7 @@ body:
     attributes:
       label: VAULT version
       description: Shown in the page footer.
-      placeholder: "2.0.1"
+      placeholder: "2.0.2"
     validations:
       required: true
   - type: input
