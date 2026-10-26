@@ -70,6 +70,16 @@ test('key derivation runs in a worker', async ({ page, work, problems }) => {
   expect(problems).toEqual([]);
 });
 
+// Browser translation would send file names and other page text to a third
+// party, and its injected UI renders unstyled under our CSP ("Original text",
+// "Contribute a better translation" at the bottom of the page).
+test('the page opts out of browser translation', async ({ page, problems }) => {
+  await openApp(page, 'blob');
+  await expect(page.locator('html')).toHaveAttribute('translate', 'no');
+  await expect(page.locator('meta[name="google"]')).toHaveAttribute('content', 'notranslate');
+  expect(problems).toEqual([]);
+});
+
 test('plain HTTP on a non-local host shows a clear explanation (audit H4)', async ({ browserName, baseURL }) => {
   test.skip(browserName !== 'chromium', 'host mapping uses a Chromium flag');
   const port = new URL(baseURL).port;
