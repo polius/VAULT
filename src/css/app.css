@@ -102,6 +102,16 @@
   display: none !important;
 }
 
+/* Translation is off (translate="no" in index.html), but Chrome can still run its translator
+   (from its menu, or when set to always translate English). Its popup is styled from Google,
+   which style-src 'self' blocks, so it would sit unstyled under the page. */
+#goog-gt-tt,
+.goog-te-balloon-frame,
+.goog-te-spinner-pos {
+  /* biome-ignore lint/complexity/noImportantStyles: must win over the injected element's own styles */
+  display: none !important;
+}
+
 html {
   -webkit-text-size-adjust: 100%;
 }
