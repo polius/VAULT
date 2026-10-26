@@ -9,7 +9,7 @@ Nothing is ever uploaded.
 <a href="https://github.com/polius/vault/actions/workflows/release.yml"><img alt="Release workflow" src="https://github.com/polius/vault/actions/workflows/release.yml/badge.svg"></a>&nbsp;<a href="https://github.com/polius/vault/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/polius/vault"></a>&nbsp;<a href="https://hub.docker.com/r/poliuscorp/vault"><img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/poliuscorp/vault"></a>
 </p>
 
-<a href="https://vault.alzina.dev/video.mp4"><img src="docs/assets/video-poster.png" alt="Watch the VAULT video: a one-minute walkthrough of encrypting and decrypting a file"></a>
+<a href="https://pol.alzina.dev/videos/vault.mp4"><img src="docs/assets/video-poster.png" alt="Watch the VAULT video: a one-minute walkthrough of encrypting and decrypting a file"></a>
 
 <p align="center">
 <a href="https://vault.alzina.dev"><b>Try it at vault.alzina.dev</b></a> · <a href="#installation">Self-host</a> · <a href="#security-model">How it's secured</a>
