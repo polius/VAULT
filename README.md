@@ -18,13 +18,13 @@ Nothing is ever uploaded.
 
 ## Features
 
-- **Files, many files, or whole folders.** Several files or a folder are packed into a single ZIP and encrypted as one `.vault` file.
-- **One drop zone.** Drop anything anywhere on the page. `.vault` files switch VAULT to decrypt; you can override it.
-- **Strong, modern crypto.** AES-256-GCM with a key derived by Argon2id (64 MiB, 3 passes). The original file name and size are encrypted too.
-- **Wrong passwords are caught early**, before any save dialog opens. Truncated, extended or edited files are rejected.
-- **Large files.** Output streams straight to disk where the browser allows it, so file size is limited by your disk, not your memory.
-- **Better passwords.** A strength estimate with a guess-time, a confirmation field, and a 6-word passphrase generator.
-- **Light and dark themes**, keyboard and screen-reader friendly.
+- **Files or whole folders.** Several files or a folder become a single `.vault` file.
+- **One drop zone.** Drop anything anywhere; `.vault` files switch to decrypt.
+- **Strong crypto.** AES-256-GCM and Argon2id. File name and size are encrypted too.
+- **Tamper-evident.** Wrong passwords fail up front; edited or truncated files are rejected.
+- **Large files.** Streams straight to disk where the browser supports it.
+- **Better passwords.** Strength estimate, confirmation field and passphrase generator.
+- **Accessible.** Light and dark themes, keyboard and screen-reader friendly.
 
 The `.vault` format is documented in [FORMAT.md](FORMAT.md), and the threat model in [SECURITY.md](SECURITY.md).
 
