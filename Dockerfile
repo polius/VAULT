@@ -10,8 +10,10 @@ COPY src /vault
 
 # Readable by the nginx user whatever the host umask was. Nothing is writable:
 # the container can also run with --read-only (nginx then needs a tmpfs on /tmp).
+# apk upgrade picks up Alpine security fixes that the base image doesn't have
+# yet, and Dependabot can't see.
 USER root
-RUN chmod -R a+rX,go-w /vault /etc/nginx/conf.d/default.conf
+RUN apk upgrade --no-cache && chmod -R a+rX,go-w /vault /etc/nginx/conf.d/default.conf
 USER 101
 
 EXPOSE 8080
