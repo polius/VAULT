@@ -12,8 +12,8 @@
     "serve": "node scripts/serve.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.4",
-    "hash-wasm": "4.12.0"
+    "@biomejs/biome": "2.6.6",
+    "hash-wasm": "4.13.0"
   },
   "engines": {
     "node": ">=22"
