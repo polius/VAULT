@@ -82,7 +82,10 @@ const ui = Object.fromEntries(
     'doneName',
     'doneMeta',
     'doneDetail',
+    'downloadAgain',
     'againBtn',
+    'encCaps',
+    'decCaps',
     'live',
   ].map((id) => [id, $(id)]),
 );
@@ -99,6 +102,7 @@ const state = {
   session: null, // unlocked decrypt session waiting for a save location
   controller: null,
   sink: null,
+  result: null, // an in-memory result that can be downloaded again
   resume: null,
   dicts: null,
 };
@@ -338,6 +342,8 @@ async function select(selection) {
     ui.pickError.hidden = false;
     return;
   }
+  state.result?.release();
+  state.result = null;
   state.selection = dedupePaths(selection);
   state.info = null;
   state.infoError = null;
@@ -383,6 +389,8 @@ function clearSecrets() {
 
 function reset() {
   clearSecrets();
+  state.result?.release();
+  state.result = null;
   state.selection = null;
   state.info = null;
   state.infoError = null;
@@ -508,8 +516,9 @@ function fail(err, context) {
   setMessage(kind, text);
   announce(text);
   if (err?.code === E.WRONG_PASSWORD) {
-    ui.decPwd.value = '';
+    // Keep it: the person is still here, and needs it to find the typo (audit F10).
     ui.decPwd.focus();
+    ui.decPwd.select();
   } else if (state.mode === 'encrypt') ui.encGo.focus();
   else ui.decGo.focus();
 }
@@ -517,7 +526,10 @@ function fail(err, context) {
 // notes: short sentences, one line each on a laptop.
 function finish({ title, icon, size, notes = [] }) {
   const { name } = state.sink;
-  const meta = `${formatBytes(size)} · ${state.sink.mode === 'fs' ? 'Saved where you chose' : 'Saved to your downloads'}`;
+  // A download is handed to the browser; VAULT can't know what it did with it (audit F9).
+  const meta = `${formatBytes(size)} · ${state.sink.mode === 'fs' ? 'Saved where you chose' : 'Sent to your browser’s downloads'}`;
+  state.result = state.sink.mode === 'blob' ? state.sink : null;
+  ui.downloadAgain.hidden = !state.result;
   state.sink = null;
   state.controller = null;
   clearSecrets();
@@ -641,11 +653,17 @@ async function startEncrypt() {
     }
     signal.throwIfAborted();
     await state.sink.close();
+    const many = job.meta.type === 'zip';
     finish({
       title: 'Encrypted',
       icon: 'i-vault',
       size: outSize,
-      notes: ['Keep your password safe. Without it, no one can open this file.'],
+      notes: [
+        many
+          ? 'Your original files are unchanged. Delete them yourself if you only want to keep the encrypted copy.'
+          : 'Your original file is unchanged. Delete it yourself if you only want to keep the encrypted copy.',
+        'Without the password, nobody can open it, not even you.',
+      ],
     });
   } catch (err) {
     await state.sink?.abort();
@@ -787,6 +805,23 @@ function wire() {
 
   ui.clearBtn.addEventListener('click', reset);
   ui.againBtn.addEventListener('click', reset);
+  ui.downloadAgain.addEventListener('click', () => state.result?.again());
+
+  // Caps Lock, while a password field has focus (audit F10).
+  for (const [input, hint] of [
+    [ui.encPwd, ui.encCaps],
+    [ui.encPwd2, ui.encCaps],
+    [ui.decPwd, ui.decCaps],
+  ]) {
+    const check = (e) => {
+      hint.hidden = !e.getModifierState?.('CapsLock');
+    };
+    input.addEventListener('keydown', check);
+    input.addEventListener('keyup', check);
+    input.addEventListener('blur', () => {
+      hint.hidden = true;
+    });
+  }
   ui.modeEnc.addEventListener('change', () => setMode('encrypt'));
   ui.modeDec.addEventListener('change', () => setMode('decrypt'));
 

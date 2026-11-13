@@ -6,6 +6,7 @@
 //
 //   const sink = await openSink({ name, size, mime })
 //   await sink.write(bytes)   await sink.close()   await sink.abort()
+//   blob only: sink.again() repeats the download, sink.release() frees the memory
 //
 // write() never modifies or detaches the caller's bytes, and callers never
 // modify bytes after passing them to write().
@@ -212,8 +213,20 @@ async function openSwSink({ name, size, mime }) {
   };
 }
 
+// The result stays available for again() until release(), so the page can
+// offer "Download again" when the browser blocked or lost the first one.
 function openBlobSink({ name, mime }) {
   let parts = [];
+  let url = null;
+  const download = () => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.hidden = true;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
   return {
     mode: 'blob',
     name,
@@ -221,16 +234,16 @@ function openBlobSink({ name, mime }) {
       parts.push(bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength ? bytes : bytes.slice());
     },
     async close() {
-      const url = URL.createObjectURL(new Blob(parts, { type: mime || 'application/octet-stream' }));
+      url = URL.createObjectURL(new Blob(parts, { type: mime || 'application/octet-stream' }));
       parts = [];
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = name;
-      a.hidden = true;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      download();
+    },
+    again() {
+      if (url) download();
+    },
+    release() {
+      if (url) URL.revokeObjectURL(url);
+      url = null;
     },
     async abort() {
       parts = [];

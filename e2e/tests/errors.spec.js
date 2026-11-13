@@ -36,8 +36,12 @@ test('wrong password: checked before the save dialog opens (audit M9)', async ({
   await pick(page, file);
   await decrypt(page, 'wrong password');
   await expect(page.locator('#messageText')).toHaveText('Wrong password. Check it and try again.');
-  await expect(page.locator('#decPwd')).toHaveValue('');
+  // Kept and selected, so a typo can be found or the whole thing retyped (audit F10).
+  await expect(page.locator('#decPwd')).toHaveValue('wrong password');
   await expect(page.locator('#decPwd')).toBeFocused();
+  expect(
+    await page.locator('#decPwd').evaluate((el) => el.selectionStart === 0 && el.selectionEnd === el.value.length),
+  ).toBe(true);
   expect(fsCap.picks).toBe(0);
   const dec = await capture(page, 'fs', fsCap, () => decrypt(page, STRONG), work);
   expect(dec.bytes.length).toBe(50_000);

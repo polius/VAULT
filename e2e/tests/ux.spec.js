@@ -183,6 +183,39 @@ test('passwords are cleared after a successful run', async ({ page, work, proble
   expect(problems).toEqual([]);
 });
 
+test('the done screen says the original is unchanged, and offers the download again (audit F9)', async ({
+  page,
+  work,
+  problems,
+}) => {
+  await openApp(page, 'blob');
+  const src = await makeFile(work, 'a.txt', 1000);
+  await pick(page, src.path);
+  const first = await capture(page, 'blob', null, () => encrypt(page, STRONG), work, 'first.vault');
+  await expect(page.locator('#doneDetail')).toContainText('Your original file is unchanged.');
+  await expect(page.locator('#doneMeta')).toContainText('Sent to your browser’s downloads');
+  const again = await capture(page, 'blob', null, () => page.click('#downloadAgain'), work, 'again.vault');
+  expect(again.name).toBe('a.txt.vault');
+  expect(again.bytes.equals(first.bytes)).toBe(true);
+  expect(problems).toEqual([]);
+});
+
+test('Caps Lock is pointed out while typing a password (audit F10)', async ({ page, work, problems, browserName }) => {
+  test.skip(browserName !== 'chromium', 'synthetic Caps Lock state is Chromium-only');
+  await openApp(page, 'blob');
+  const src = await makeFile(work, 'a.txt', 10);
+  await pick(page, src.path);
+  const key = (caps) =>
+    page.locator('#encPwd').evaluate((el, caps) => {
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', modifierCapsLock: caps, bubbles: true }));
+    }, caps);
+  await key(true);
+  await expect(page.locator('#encCaps')).toBeVisible();
+  await key(false);
+  await expect(page.locator('#encCaps')).toBeHidden();
+  expect(problems).toEqual([]);
+});
+
 test('theme follows the system and the toggle persists (audit L8)', async ({ page, problems }) => {
   await page.emulateMedia({ colorScheme: 'light' });
   await openApp(page, 'blob');

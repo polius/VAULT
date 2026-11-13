@@ -35,7 +35,7 @@ for (const sink of ['sw', 'fs', 'blob']) {
       await expect(page.locator('#doneTitle')).toHaveText('Encrypted');
       await expect(page.locator('#doneName')).toHaveText('Quarterly report ü.pdf.vault');
       await expect(page.locator('#doneMeta')).toContainText(
-        sink === 'fs' ? 'Saved where you chose' : 'Saved to your downloads',
+        sink === 'fs' ? 'Saved where you chose' : 'Sent to your browser’s downloads',
       );
       // The cleartext header must not leak the name (audit M1).
       expect(enc.bytes.subarray(0, 400).includes('Quarterly')).toBe(false);

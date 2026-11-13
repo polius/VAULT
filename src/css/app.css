@@ -703,6 +703,11 @@ label {
   color: var(--unlock);
 }
 
+.help.caps {
+  color: var(--warn);
+  font-weight: 600;
+}
+
 .meter {
   display: flex;
   flex-wrap: wrap;

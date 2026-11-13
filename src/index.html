@@ -144,6 +144,7 @@
             </div>
             <p class="help" id="confirmHelp"></p>
           </div>
+          <p class="help caps" id="encCaps" hidden>Caps Lock is on.</p>
           <details class="options">
             <summary>Options</summary>
             <label class="check"><input type="checkbox" id="hideName"><span>Give the encrypted file a neutral name <span class="muted">(for example <code id="hideNameExample">vault-2026-10-25-3f9a1c.vault</code>)</span></span></label>
@@ -159,6 +160,7 @@
               <input type="password" id="decPwd" name="password" autocomplete="current-password" spellcheck="false" autocapitalize="off">
               <button type="button" class="icon-btn" id="decShow" aria-label="Show password" aria-pressed="false" title="Show password"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button>
             </div>
+            <p class="help caps" id="decCaps" hidden>Caps Lock is on.</p>
           </div>
           <button type="submit" class="btn btn-unlock btn-wide" id="decGo"><svg class="icon" aria-hidden="true"><use href="#i-unlock"/></svg><span>Decrypt</span></button>
         </form>
@@ -194,6 +196,7 @@
           </div>
         </div>
         <div class="done-detail" id="doneDetail"></div>
+        <button type="button" class="btn btn-secondary" id="downloadAgain" hidden>Download again</button>
         <button type="button" class="btn btn-secondary" id="againBtn">Encrypt or decrypt another file</button>
       </div>
 

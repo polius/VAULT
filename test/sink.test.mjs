@@ -66,7 +66,8 @@ URL.createObjectURL = (b) => {
   blobUrls.set(u, b);
   return u;
 };
-URL.revokeObjectURL = () => {};
+const revoked = [];
+URL.revokeObjectURL = (u) => revoked.push(u);
 
 const { openSink, sinkState, preferredMode } = await import('../src/js/sink.js');
 
@@ -273,6 +274,17 @@ describe('fallback chain', () => {
       assert.equal(a.download, 'b.bin');
       const blob = blobUrls.get(a.href);
       assert.deepEqual([...new Uint8Array(await blob.arrayBuffer())], [1, 2, 3, 4, 5, 6]);
+      // Kept until released, so the page can offer "Download again" (audit F9).
+      assert.ok(!revoked.includes(a.href));
+      sink.again();
+      const again = created.filter((e) => e.tagName === 'A').at(-1);
+      assert.notEqual(again, a);
+      assert.equal(again.href, a.href);
+      sink.release();
+      assert.ok(revoked.includes(a.href));
+      const count = created.length;
+      sink.again();
+      assert.equal(created.length, count, 'nothing to download after release');
     } finally {
       sinkState.forced = null;
     }
