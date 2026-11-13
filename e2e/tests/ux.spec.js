@@ -1,7 +1,7 @@
 // Interaction details: password confirmation, weak-password gate, generated
 // passphrases, drag and drop anywhere, mode switching, theme, mobile layout.
 
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { capture, decrypt, encrypt, expect, makeFile, openApp, pick, STRONG, test } from './helpers.js';
 
@@ -30,7 +30,7 @@ test('Tab goes from Password straight to Confirm', async ({ page, work, problems
   // The buttons beside Password stay reachable, backwards.
   if (browserName !== 'webkit') {
     await page.keyboard.press('Shift+Tab');
-    await expect(page.locator('#genLink')).toBeFocused();
+    await expect(page.locator('#encShow')).toBeFocused();
   }
   expect(problems).toEqual([]);
 });
@@ -55,7 +55,7 @@ test('a weak password needs a second, explicit click (audit M4)', async ({ page,
   const download = page.waitForEvent('download');
   await page.click('#encGo');
   await download;
-  await expect(page.locator('#doneTitle')).toHaveText('Encrypted');
+  await expect(page.locator('#stateTitle')).toHaveText('Encrypted');
   expect(problems).toEqual([]);
 });
 
@@ -74,7 +74,8 @@ test('a generated passphrase is shown, needs no confirmation, can be copied and 
   // Generating loads the wordlist first.
   await expect(page.locator('#encPwd')).toHaveValue(/^[a-z]+(-[a-z]+){5}$/);
   const phrase = await page.inputValue('#encPwd');
-  await expect(page.locator('#encPwd')).toHaveAttribute('type', 'text');
+  // Shown once, whole, in the block; the field stays masked.
+  await expect(page.locator('#encPwd')).toHaveAttribute('type', 'password');
   await expect(page.locator('#generated')).toBeVisible();
   await expect(page.locator('#confirmField')).toBeHidden();
   await expect(page.locator('#strengthText')).toHaveText('Very strong · beyond any realistic guessing');
@@ -96,7 +97,7 @@ test('a generated passphrase is shown, needs no confirmation, can be copied and 
   await page.click('#againBtn');
   await pick(page, file);
   await capture(page, 'blob', null, () => decrypt(page, phrase), work, 'g.out');
-  await expect(page.locator('#doneTitle')).toHaveText('Decrypted');
+  await expect(page.locator('#stateTitle')).toHaveText('Decrypted');
   expect(problems).toEqual([]);
 });
 
@@ -160,17 +161,100 @@ test('the drag overlay appears while dragging files over the page', async ({ pag
   expect(problems).toEqual([]);
 });
 
-test('switching modes and clearing the selection', async ({ page, work, problems }) => {
+test('the mode follows the file; a .vault file can still be encrypted again (audit F4)', async ({
+  page,
+  work,
+  problems,
+}) => {
   await openApp(page, 'blob');
   const src = await makeFile(work, 'a.txt', 10);
   await pick(page, src.path);
-  await page.click('label.mode-dec');
-  await expect(page.locator('#decForm')).toBeVisible();
-  await page.click('label.mode-enc');
+  await expect(page.locator('#stateTitle')).toHaveText('Encrypt');
   await expect(page.locator('#encForm')).toBeVisible();
+  await expect(page.locator('#switchMode')).toBeHidden();
+  const enc = await capture(page, 'blob', null, () => encrypt(page, STRONG), work, 'a.vault');
+  const file = path.join(work, 'a.txt.vault');
+  await writeFile(file, enc.bytes);
+  await page.click('#againBtn');
+  await pick(page, file);
+  await expect(page.locator('#stateTitle')).toHaveText('Decrypt');
+  await expect(page.locator('#bar')).toHaveAttribute('data-state', 'sealed');
+  await page.click('#switchMode');
+  await expect(page.locator('#encForm')).toBeVisible();
+  await expect(page.locator('#stateTitle')).toHaveText('Encrypt');
+  await expect(page.locator('#saveAs')).toHaveText('saves a.txt.vault.vault');
+  await page.click('#switchMode');
+  await expect(page.locator('#decForm')).toBeVisible();
   await page.click('#clearBtn');
   await expect(page.locator('#pick')).toBeVisible();
   await expect(page.locator('#pickFilesBtn')).toBeFocused();
+  expect(problems).toEqual([]);
+});
+
+test('several .vault files decrypt one after another with one password (audit F7)', async ({
+  page,
+  work,
+  problems,
+}) => {
+  await openApp(page, 'blob');
+  const files = [];
+  for (const name of ['one.txt', 'two.txt']) {
+    const src = await makeFile(work, name, 3000);
+    await pick(page, src.path);
+    const enc = await capture(page, 'blob', null, () => encrypt(page, STRONG), work, `${name}.vault`);
+    const file = path.join(work, `${name}.vault`);
+    await writeFile(file, enc.bytes);
+    files.push({ file, src });
+    await page.click('#againBtn');
+  }
+  await pick(
+    page,
+    files.map((f) => f.file),
+  );
+  await expect(page.locator('#stateTitle')).toHaveText('Decrypt 2 files');
+  await expect(page.locator('#decGo')).toHaveText('Decrypt 2 files');
+  const downloads = [];
+  page.on('download', (d) => downloads.push(d));
+  await decrypt(page, STRONG);
+  await expect(page.locator('#stateTitle')).toHaveText('Decrypted');
+  await expect(page.locator('#selName')).toHaveText('2 files');
+  expect(downloads.map((d) => d.suggestedFilename()).sort()).toEqual(['one.txt', 'two.txt']);
+  for (const d of downloads) {
+    const out = path.join(work, `out-${d.suggestedFilename()}`);
+    await d.saveAs(out);
+    const src = files.find((f) => f.src.path.endsWith(d.suggestedFilename())).src;
+    expect((await readFile(out)).equals(src.data)).toBe(true);
+  }
+  expect(problems).toEqual([]);
+});
+
+test('a second password is asked for when one .vault file of several needs it (audit F7)', async ({
+  page,
+  work,
+  problems,
+}) => {
+  await openApp(page, 'blob');
+  const made = [];
+  for (const [name, pw] of [
+    ['one.txt', STRONG],
+    ['two.txt', `${STRONG}-other`],
+  ]) {
+    const src = await makeFile(work, name, 100);
+    await pick(page, src.path);
+    const enc = await capture(page, 'blob', null, () => encrypt(page, pw), work, `${name}.vault`);
+    const file = path.join(work, `${name}.vault`);
+    await writeFile(file, enc.bytes);
+    made.push(file);
+    await page.click('#againBtn');
+  }
+  await pick(page, made);
+  await decrypt(page, STRONG);
+  await expect(page.locator('#messageText')).toHaveText(
+    '1 of 2 files decrypted and saved. “two.txt.vault” needs a different password.',
+  );
+  await expect(page.locator('#selName')).toHaveText('two.txt.vault');
+  await capture(page, 'blob', null, () => decrypt(page, `${STRONG}-other`), work, 'two.out');
+  await expect(page.locator('#stateTitle')).toHaveText('Decrypted');
   expect(problems).toEqual([]);
 });
 
@@ -220,14 +304,21 @@ test('theme follows the system and the toggle persists (audit L8)', async ({ pag
   await page.emulateMedia({ colorScheme: 'light' });
   await openApp(page, 'blob');
   const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  expect(await bg()).toBe('rgb(245, 246, 248)');
+  const LIGHT = 'rgb(244, 244, 240)';
+  const DARK = 'rgb(16, 18, 20)';
+  expect(await bg()).toBe(LIGHT);
   await page.emulateMedia({ colorScheme: 'dark' });
-  expect(await bg()).toBe('rgb(13, 17, 23)');
-  await page.click('[data-theme-set="light"]');
-  expect(await bg()).toBe('rgb(245, 246, 248)');
+  expect(await bg()).toBe(DARK);
+  // One button cycles Auto -> Light -> Dark and names the current one.
+  await expect(page.locator('#themeBtn')).toHaveText('Theme: Auto');
+  await page.click('#themeBtn');
+  await expect(page.locator('#themeBtn')).toHaveText('Theme: Light');
+  expect(await bg()).toBe(LIGHT);
   await page.reload();
-  expect(await bg()).toBe('rgb(245, 246, 248)');
-  await expect(page.locator('[data-theme-set="light"]')).toHaveAttribute('aria-pressed', 'true');
+  expect(await bg()).toBe(LIGHT);
+  await expect(page.locator('#themeBtn')).toHaveText('Theme: Light');
+  await page.click('#themeBtn');
+  expect(await bg()).toBe(DARK);
   expect(problems).toEqual([]);
 });
 

@@ -83,7 +83,7 @@ test('a truncated file is refused before anything is written', async ({ page, wo
   expect(problems).toEqual([]);
 });
 
-test('a file that is not a VAULT file goes to Encrypt; forcing Decrypt explains why not', async ({
+test('a file that is not a VAULT file goes to Encrypt, with no way into a dead end (audit F4)', async ({
   page,
   work,
   problems,
@@ -91,12 +91,9 @@ test('a file that is not a VAULT file goes to Encrypt; forcing Decrypt explains 
   await openApp(page, 'blob');
   const src = await makeFile(work, 'photo.jpg', 2000);
   await pick(page, src.path);
-  await expect(page.locator('#modeEnc')).toBeChecked();
-  await page.click('label.mode-dec');
-  await expect(page.locator('#vaultInfo')).toHaveText(
-    "This isn't a VAULT file. Choose Encrypt to protect it, or pick a .vault file.",
-  );
-  await expect(page.locator('#decGo')).toBeDisabled();
+  await expect(page.locator('#encForm')).toBeVisible();
+  await expect(page.locator('#decForm')).toBeHidden();
+  await expect(page.locator('#switchMode')).toBeHidden();
   expect(problems).toEqual([]);
 });
 
@@ -113,7 +110,8 @@ test('a file from a newer VAULT is recognised', async ({ page, work, problems })
   const file = path.join(work, 'future.vault');
   await writeFile(file, Buffer.concat([Buffer.from('AES1'), Buffer.from([9]), Buffer.alloc(40)]));
   await pick(page, file);
-  await expect(page.locator('#modeDec')).toBeChecked();
+  await expect(page.locator('#decForm')).toBeVisible();
+  await expect(page.locator('#decGo')).toBeDisabled();
   await expect(page.locator('#vaultInfo')).toContainText('newer version of VAULT');
   expect(problems).toEqual([]);
 });
@@ -176,7 +174,7 @@ test('a download the browser sends past the Service Worker falls back instead of
   await pick(page, src.path);
   const enc = await capture(page, 'blob', null, () => encrypt(page, STRONG), work, 'n.vault');
   expect(enc.name).toBe('notes.txt.vault');
-  await expect(page.locator('#doneTitle')).toHaveText('Encrypted');
+  await expect(page.locator('#stateTitle')).toHaveText('Encrypted');
 
   const file = path.join(work, 'notes.txt.vault');
   await writeFile(file, enc.bytes);
@@ -228,6 +226,6 @@ test('an expired click asks for one more before showing the save dialog', async 
   await decrypt(page, STRONG);
   await expect(page.locator('#messageText')).toContainText('Password correct');
   await page.click('#messageAction');
-  await expect(page.locator('#doneTitle')).toHaveText('Decrypted');
+  await expect(page.locator('#stateTitle')).toHaveText('Decrypted');
   expect(problems).toEqual([]);
 });
