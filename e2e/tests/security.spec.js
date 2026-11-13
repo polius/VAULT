@@ -152,6 +152,16 @@ test.describe('accessibility (axe, WCAG 2.1 AA)', () => {
       await page.click('#decGo');
       await expect(page.locator('#message')).toBeVisible();
       expect(await audit(page), 'decrypt with error').toEqual([]);
+      const vectors = new URL('../../test/vectors/', import.meta.url);
+      await page.click('#clearBtn');
+      await pick(page, [new URL('v3-10000.vault', vectors).pathname, new URL('v2-1000.vault', vectors).pathname]);
+      await expect(page.locator('#stateTitle')).toHaveText('Decrypt 2 files');
+      expect(await audit(page), 'several vault files').toEqual([]);
+      await page.click('#clearBtn');
+      const other = await makeFile(work, 'b.txt', 10);
+      await pick(page, [src.path, other.path]);
+      await expect(page.locator('#fileListItems button')).toHaveCount(2);
+      expect(await audit(page), 'several files, list open').toEqual([]);
     });
   }
 

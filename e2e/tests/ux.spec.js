@@ -215,6 +215,69 @@ test('files dropped anywhere on the page are taken, never opened by the browser 
   expect(problems).toEqual([]);
 });
 
+// Fires a drop of in-page files on the page, like dragging from the desktop.
+function dropFiles(page, files) {
+  return page.evaluate(async (files) => {
+    const dt = new DataTransfer();
+    for (const f of files) {
+      const bytes = f.b64 ? Uint8Array.from(atob(f.b64), (c) => c.charCodeAt(0)) : f.text;
+      dt.items.add(new File([bytes], f.name, { lastModified: 1 }));
+    }
+    const fire = (type) =>
+      document.body.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt }));
+    fire('dragenter');
+    const label = document.querySelector('#dropText').textContent;
+    fire('dragover');
+    fire('drop');
+    return label;
+  }, files);
+}
+
+test('a drop adds to a selection of files, and each file can be removed (audit F6)', async ({
+  page,
+  work,
+  problems,
+}) => {
+  await openApp(page, 'blob');
+  const src = await makeFile(work, 'a.txt', 10);
+  await pick(page, src.path);
+  await page.fill('#encPwd', STRONG);
+  expect(await dropFiles(page, [{ name: 'second.txt', text: 'world!' }])).toBe('Drop to add');
+  await expect(page.locator('#encGo')).toHaveText('Encrypt 2 files');
+  await expect(page.locator('#fileList')).toHaveAttribute('open', '');
+  await expect(page.locator('#fileListItems li')).toHaveCount(2);
+  // The typed password belongs to the same job, so it stays.
+  await expect(page.locator('#encPwd')).toHaveValue(STRONG);
+  // The same file again is listed once.
+  await dropFiles(page, [{ name: 'second.txt', text: 'world!' }]);
+  await expect(page.locator('#fileListItems li')).toHaveCount(2);
+  await page.click('button[aria-label="Remove a.txt"]');
+  await expect(page.locator('#encGo')).toHaveText('Encrypt');
+  await expect(page.locator('#selName')).toHaveText('second.txt');
+  await expect(page.locator('#fileList')).toBeHidden();
+  expect(problems).toEqual([]);
+});
+
+test('.vault files dropped onto ordinary files start again, and say so (audit F6)', async ({
+  page,
+  work,
+  problems,
+}) => {
+  await openApp(page, 'blob');
+  const src = await makeFile(work, 'a.txt', 10);
+  await pick(page, src.path);
+  const enc = await capture(page, 'blob', null, () => encrypt(page, STRONG), work, 'a.vault');
+  await page.click('#againBtn');
+  await pick(page, src.path);
+  await dropFiles(page, [{ name: 'a.txt.vault', b64: enc.bytes.toString('base64') }]);
+  await expect(page.locator('#decForm')).toBeVisible();
+  await expect(page.locator('#messageText')).toContainText('Started again with what you dropped');
+  // Over a .vault selection, the overlay says a drop replaces it.
+  expect(await dropFiles(page, [{ name: 'b.txt', text: 'b' }])).toBe('Drop to replace');
+  await expect(page.locator('#selName')).toHaveText('b.txt');
+  expect(problems).toEqual([]);
+});
+
 test('the drag overlay appears while dragging files over the page', async ({ page, problems }) => {
   await openApp(page, 'blob');
   await page.evaluate(() => {

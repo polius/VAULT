@@ -370,18 +370,32 @@ function renderFileList() {
   const { files, dirs } = state.selection;
   const single = files.length === 1 && !dirs.length;
   ui.fileList.hidden = single;
-  ui.fileList.open = false;
-  ui.fileListSummary.textContent = 'Show files';
+  // Short lists are open from the start; each row can be removed (audit F6).
+  ui.fileList.open = !single && files.length + dirs.length <= 8;
+  ui.fileListSummary.textContent = ui.fileList.open ? 'Hide files' : 'Show files';
   ui.fileListItems.replaceChildren(
-    ...files.slice(0, MAX_LISTED_FILES).map((f) => {
+    ...files.slice(0, MAX_LISTED_FILES).map((f, index) => {
       const li = document.createElement('li');
       const name = document.createElement('span');
       const size = document.createElement('span');
+      const remove = document.createElement('button');
       name.className = 'file-path';
       size.className = 'file-size';
       name.textContent = f.path;
       size.textContent = formatBytes(f.file.size);
-      li.append(name, size);
+      remove.type = 'button';
+      remove.className = 'icon-btn';
+      remove.setAttribute('aria-label', `Remove ${f.path}`);
+      remove.title = 'Remove';
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+      svg.setAttribute('class', 'icon');
+      svg.setAttribute('aria-hidden', 'true');
+      use.setAttribute('href', '#i-x');
+      svg.append(use);
+      remove.append(svg);
+      remove.addEventListener('click', () => removeFile(index));
+      li.append(name, size, remove);
       return li;
     }),
   );
@@ -513,7 +527,49 @@ async function classify() {
   return 'decrypt';
 }
 
-async function select(selection) {
+// Ordinary files dropped or pasted onto ordinary files join them; anything
+// involving .vault files starts again (audit F6).
+const mergeable = () => state.view === 'job' && state.auto === 'encrypt' && state.mode === 'encrypt';
+
+async function allVaults(selection) {
+  const { files, dirs } = selection;
+  if (dirs.length || !files.length || files.length > MAX_VAULT_BATCH) return false;
+  const infos = await Promise.all(files.map((f) => inspect(f.file).then(Boolean, () => false)));
+  return infos.every(Boolean);
+}
+
+async function add(incoming) {
+  if (!mergeable() || !(incoming.files.length || incoming.dirs.length)) return select(incoming);
+  if (await allVaults(incoming)) {
+    await select(incoming);
+    if (state.mode === 'decrypt') {
+      const text = 'Started again with what you dropped: .vault files are decrypted on their own.';
+      setMessage('info', text);
+      announce(text);
+    }
+    return;
+  }
+  // The same file dropped twice is listed once.
+  const key = (f) => `${f.path}\u0000${f.file.size}\u0000${f.file.lastModified}`;
+  const have = new Set(state.selection.files.map(key));
+  const files = [...state.selection.files, ...incoming.files.filter((f) => !have.has(key(f)))];
+  const dirs = [...new Set([...state.selection.dirs, ...incoming.dirs])];
+  const before = state.selection.files.length;
+  await select({ files, dirs }, { keepFocus: true });
+  announce(`Added ${plural(files.length - before, 'file')}. ${plural(files.length, 'file')} selected.`);
+}
+
+function removeFile(index) {
+  const files = state.selection.files.filter((_, i) => i !== index);
+  if (!files.length && !state.selection.dirs.length) return reset();
+  return select({ files, dirs: state.selection.dirs }, { keepFocus: true }).then(() => {
+    // Keep the keyboard where it was: the next row's button, or the list.
+    const buttons = ui.fileListItems.querySelectorAll('button');
+    (buttons[Math.min(index, buttons.length - 1)] ?? (ui.fileList.hidden ? ui.encPwd : ui.fileListSummary)).focus();
+  });
+}
+
+async function select(selection, { keepFocus = false } = {}) {
   if (state.view === 'work') {
     announce('Wait for the current file to finish, or cancel it first.');
     return;
@@ -541,6 +597,7 @@ async function select(selection) {
   renderFileList();
   setMode(state.auto);
   show('job');
+  if (keepFocus) return;
   const name = ui.selName.textContent;
   announce(
     state.mode === 'decrypt'
@@ -1039,7 +1096,8 @@ function wire() {
     e.preventDefault();
     depth++;
     if (state.view !== 'work') {
-      ui.dropText.textContent = state.view === 'pick' ? 'Drop to choose' : 'Drop to replace';
+      ui.dropText.textContent =
+        state.view === 'job' ? (mergeable() ? 'Drop to add' : 'Drop to replace') : 'Drop to choose';
       ui.dropOverlay.hidden = false;
       document.body.classList.add('dragging');
     }
@@ -1067,7 +1125,7 @@ function wire() {
       announce('Wait for the current file to finish, or cancel it first.');
       return;
     }
-    fromDataTransfer(e.dataTransfer).then(select, (err) => {
+    fromDataTransfer(e.dataTransfer).then(add, (err) => {
       if (state.view !== 'pick') reset();
       ui.pickError.textContent = `Couldn’t read what was dropped: ${err.message}`;
       ui.pickError.hidden = false;
@@ -1172,7 +1230,7 @@ function wire() {
     if (!files?.length) return;
     e.preventDefault();
     if (state.view === 'work') announce('Wait for the current file to finish, or cancel it first.');
-    else select(fromFileList(files));
+    else add(fromFileList(files));
   });
   // Escape leaves a job nobody has typed into yet; during a run it reaches
   // Cancel without cancelling by itself.
