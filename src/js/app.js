@@ -141,23 +141,32 @@ function setIcon(svg, id) {
   svg.querySelector('use').setAttribute('href', `#${id}`);
 }
 
-function setMessage(kind, text, action) {
+// action: { label, run, primary }. after: the element to sit under; by default
+// the message sits right above the active form's main button.
+function setMessage(kind, text, action, after) {
   if (!kind) {
     ui.message.hidden = true;
     state.resume = null;
     return;
   }
-  // Sit right above the active form's main button.
   const form = state.mode === 'decrypt' ? ui.decForm : ui.encForm;
-  form.insertBefore(ui.message, form.querySelector('.actions'));
+  if (after) after.after(ui.message);
+  else form.insertBefore(ui.message, form.querySelector('.actions'));
   ui.message.className = `notice notice-${kind}`;
   ui.message.setAttribute('role', kind === 'error' ? 'alert' : 'status');
   setIcon(ui.message.querySelector('svg'), kind === 'info' ? 'i-info' : 'i-alert');
   ui.messageText.textContent = text;
   ui.messageAction.hidden = !action;
+  ui.messageAction.className = action?.primary ? 'btn btn-ink' : 'btn btn-small';
   state.resume = action?.run ?? null;
   if (action) ui.messageAction.textContent = action.label;
   ui.message.hidden = false;
+}
+
+// While the weak-password gate shows, the risky choice is the quiet button (audit F5).
+function setGoQuiet(quiet) {
+  ui.encGo.classList.toggle('btn-lock', !quiet);
+  ui.encGo.classList.toggle('btn-ghost', quiet);
 }
 
 function setButtonLabel(btn, text) {
@@ -437,8 +446,13 @@ function renderSwitch() {
         : 'Decrypt it instead';
 }
 
+// Also names each file to password managers, which otherwise see every file as
+// the same account and offer to overwrite one with the next (audit F13).
 function renderSaveAs() {
-  ui.saveAs.textContent = `saves ${outName()}`;
+  const out = outName();
+  ui.saveAs.textContent = `saves ${out}`;
+  ui.encForm.elements.username.value = out;
+  ui.decForm.elements.username.value = state.queue[0]?.file.name ?? 'VAULT file';
 }
 
 function renderJob() {
@@ -460,6 +474,7 @@ function setMode(mode) {
   ui.app.dataset.mode = mode;
   ui.encForm.hidden = mode !== 'encrypt';
   ui.decForm.hidden = mode !== 'decrypt';
+  setGoQuiet(false);
   ui.hideNameExample.textContent = neutralName();
   renderJob();
   setMessage(null);
@@ -625,6 +640,7 @@ function updateEncryptFields() {
     setMessage(null);
     setButtonLabel(ui.encGo, encryptLabel());
   }
+  setGoQuiet(false);
   updateStrength();
   updateConfirm();
 }
@@ -659,6 +675,19 @@ async function copyPassphrase() {
   setTimeout(() => {
     label.textContent = 'Copy';
   }, 2500);
+}
+
+async function generatePhrase() {
+  const phrase = await generatePassphrase();
+  ui.encPwd.value = phrase;
+  ui.encPwd2.value = '';
+  state.generated = phrase;
+  state.saved = false;
+  // Shown once, whole, in the block below; the field keeps it masked.
+  setShown(ui.encShow, [ui.encPwd, ui.encPwd2], false);
+  updateEncryptFields();
+  ui.encPwd.focus();
+  announce('Passphrase generated and shown below the password field. Store it before you continue.');
 }
 
 // ---------- running a job ----------
@@ -807,11 +836,15 @@ async function startEncrypt() {
   const strength = estimate(password, await ensureDictionaries());
   if (strength.weak && state.proceed !== 'weak') {
     state.proceed = 'weak';
+    // Right under the meter it is about, with the safe choice as the big button (audit F5).
     setMessage(
       'warn',
       `This password is ${strength.label.toLowerCase()}. ${attackerSentence(strength.crackSeconds)} Use a longer one or generate a passphrase, or encrypt anyway.`,
+      { label: 'Use a generated passphrase', run: generatePhrase, primary: true },
+      ui.meter,
     );
     setButtonLabel(ui.encGo, 'Encrypt anyway');
+    setGoQuiet(true);
     announce(ui.messageText.textContent);
     return;
   }
@@ -828,6 +861,7 @@ async function startEncrypt() {
   if (await needsMemoryConfirm(outSize, startEncrypt)) return;
   state.proceed = null;
   setButtonLabel(ui.encGo, encryptLabel());
+  setGoQuiet(false);
 
   begin('encrypt');
   const barName = ui.selName.title;
@@ -1103,20 +1137,8 @@ function wire() {
     if (!ui.message.hidden && state.resume === null) setMessage(null);
   });
 
-  const generate = async () => {
-    const phrase = await generatePassphrase();
-    ui.encPwd.value = phrase;
-    ui.encPwd2.value = '';
-    state.generated = phrase;
-    state.saved = false;
-    // Shown once, whole, in the block below; the field keeps it masked.
-    setShown(ui.encShow, [ui.encPwd, ui.encPwd2], false);
-    updateEncryptFields();
-    ui.encPwd.focus();
-    announce('Passphrase generated and shown below the password field. Store it before you continue.');
-  };
-  ui.genBtn.addEventListener('click', generate);
-  ui.genLink.addEventListener('click', generate);
+  ui.genBtn.addEventListener('click', generatePhrase);
+  ui.genLink.addEventListener('click', generatePhrase);
 
   ui.copyBtn.addEventListener('click', copyPassphrase);
   // Copying by hand counts as storing it too.
@@ -1142,6 +1164,22 @@ function wire() {
     ui.workPhase.textContent = 'Cancelling…';
     state.controller?.abort(new DOMException('Cancelled', 'AbortError'));
     state.sink?.abort();
+  });
+
+  // A copied file pasted anywhere is a selection; text pastes stay text (audit F12).
+  document.addEventListener('paste', (e) => {
+    const files = e.clipboardData?.files;
+    if (!files?.length) return;
+    e.preventDefault();
+    if (state.view === 'work') announce('Wait for the current file to finish, or cancel it first.');
+    else select(fromFileList(files));
+  });
+  // Escape leaves a job nobody has typed into yet; during a run it reaches
+  // Cancel without cancelling by itself.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    if (state.view === 'work') ui.cancelBtn.focus();
+    else if (state.view === 'job' && !ui.encPwd.value && !ui.encPwd2.value && !ui.decPwd.value) reset();
   });
 
   window.addEventListener('beforeunload', (e) => {

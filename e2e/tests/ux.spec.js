@@ -59,6 +59,71 @@ test('a weak password needs a second, explicit click (audit M4)', async ({ page,
   expect(problems).toEqual([]);
 });
 
+test('the weak-password warning sits under the meter and makes the safe choice the big button (audit F5)', async ({
+  page,
+  work,
+  problems,
+}) => {
+  await openApp(page, 'blob');
+  const src = await makeFile(work, 'a.txt', 10);
+  await pick(page, src.path);
+  await page.fill('#encPwd', 'Password1!');
+  await page.fill('#encPwd2', 'Password1!');
+  await page.click('#encGo');
+  await expect(page.locator('#message')).toBeVisible();
+  // Directly under the meter, inside the password field.
+  expect(await page.evaluate(() => document.querySelector('#meter').nextElementSibling.id)).toBe('message');
+  await expect(page.locator('#messageAction')).toHaveText('Use a generated passphrase');
+  await expect(page.locator('#messageAction')).toHaveClass(/btn-ink/);
+  await expect(page.locator('#encGo')).toHaveClass(/btn-ghost/);
+  await page.click('#messageAction');
+  await expect(page.locator('#generated')).toBeVisible();
+  await expect(page.locator('#message')).toBeHidden();
+  await expect(page.locator('#encGo')).toHaveClass(/btn-lock/);
+  expect(problems).toEqual([]);
+});
+
+test('a pasted file is selected, pasted text stays text, and Escape leaves an untouched job (audit F12)', async ({
+  page,
+  problems,
+}) => {
+  await openApp(page, 'blob');
+  const paste = (withFile) =>
+    page.evaluate((withFile) => {
+      const dt = new DataTransfer();
+      if (withFile) dt.items.add(new File(['hello'], 'pasted.txt', { type: 'text/plain' }));
+      else dt.setData('text/plain', 'just text');
+      const e = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true });
+      document.body.dispatchEvent(e);
+      return e.defaultPrevented;
+    }, withFile);
+  expect(await paste(false)).toBe(false);
+  await expect(page.locator('#pick')).toBeVisible();
+  expect(await paste(true)).toBe(true);
+  await expect(page.locator('#selName')).toHaveText('pasted.txt');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#pick')).toBeVisible();
+  // With a password typed, Escape does nothing.
+  await paste(true);
+  await page.fill('#encPwd', 'x');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#job')).toBeVisible();
+  expect(problems).toEqual([]);
+});
+
+test('password managers see each file under its own name (audit F13)', async ({ page, work, problems }) => {
+  await openApp(page, 'blob');
+  const src = await makeFile(work, 'report-q3.pdf', 10);
+  await pick(page, src.path);
+  const user = (form) => page.locator(`${form} input[name="username"]`).inputValue();
+  expect(await user('#encForm')).toBe('report-q3.pdf.vault');
+  await page.click('.options summary');
+  await page.check('#hideName');
+  expect(await user('#encForm')).toMatch(/^vault-\d{4}-\d{2}-\d{2}-[0-9a-f]{6}\.vault$/);
+  await expect(page.locator('#saveAs')).toHaveText(`saves ${await user('#encForm')}`);
+  expect(problems).toEqual([]);
+});
+
 test('a generated passphrase is shown, needs no confirmation, can be copied and decrypts (audit M5)', async ({
   page,
   context,

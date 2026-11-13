@@ -567,6 +567,16 @@ body.dragging .bar[data-state="empty"] .bar-pick {
   background: var(--unlock-hover);
 }
 
+/* The safe choice when it isn't the sealing one: ink, so blue keeps its meaning. */
+.btn-ink {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.btn-ink:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 85%, var(--bg));
+}
+
 .btn-ghost,
 .btn-small {
   background: transparent;
