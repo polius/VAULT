@@ -73,3 +73,25 @@ jobs:
           subject-name: index.docker.io/poliuscorp/vault
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+  # One line per file the site serves, by its path under the site root, so a
+  # deployment can be checked file by file against the release (SECURITY.md).
+  checksums:
+    name: Attach SHA256SUMS to the release
+    needs: push_to_registry
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Hash every file under src/
+        run: |
+          cd src
+          find . -type f -printf '%P\n' | LC_ALL=C sort | xargs -d '\n' sha256sum > "$RUNNER_TEMP/SHA256SUMS"
+          cat "$RUNNER_TEMP/SHA256SUMS"
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/SHA256SUMS" --clobber --repo "$GITHUB_REPOSITORY"

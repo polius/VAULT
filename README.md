@@ -35,7 +35,9 @@ The recommended installation method is **Docker**. The image is a static nginx s
 #### Run with Docker CLI
 
 ```bash
-docker run -d --name vault -p 80:8080 poliuscorp/vault
+docker run -d --name vault -p 80:8080 \
+  --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges \
+  poliuscorp/vault
 ```
 
 #### Run with Docker Compose
@@ -47,8 +49,19 @@ services:
     container_name: vault
     ports:
       - "80:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 ```
+
+The extra lines are the hardening [SECURITY.md](SECURITY.md) recommends: a read-only filesystem, no Linux capabilities and no privilege escalation. VAULT needs none of them.
+
+`poliuscorp/vault` follows the latest release. To run exactly the image you checked, pin it by version and digest, for example `poliuscorp/vault:2.0.3@sha256:…` (the digest is on [Docker Hub](https://hub.docker.com/r/poliuscorp/vault/tags) or from `docker buildx imagetools inspect poliuscorp/vault:2.0.3`). Pinning means updates only arrive when you change the line, which is what you want if the server is part of your threat model.
 
 > [!IMPORTANT]
 > Browsers only allow the cryptography VAULT needs on **HTTPS** pages (or `http://localhost`). Served over plain HTTP from another machine, VAULT shows a notice instead of working. For anything beyond your own computer, use the HTTPS setup below or put VAULT behind your existing reverse proxy.
@@ -86,6 +99,18 @@ Once deployed, visit `http://localhost/` (or your HTTPS domain).
 - **Decrypt:** drop a `.vault` file, type the password, and click **Decrypt**. Multi-file vaults come back as a ZIP.
 
 There is no password recovery. If you lose the password, the data is gone.
+
+### Browser support
+
+VAULT works in current Chrome, Edge, Firefox and Safari. How the result is saved depends on the browser:
+
+| Browser | How the result is saved | Size limit |
+|---|---|---|
+| Chrome, Edge and other Chromium browsers on a computer | A save dialog, then written straight to the file you chose | None in practice |
+| Firefox, Safari, and Chrome on Android | Streamed to the browser's downloads through a Service Worker | None in practice |
+| Any browser where neither works (for example with the Service Worker blocked or bypassed) | Held in memory, then offered as a download | VAULT warns above 512 MB; the device's memory is the limit |
+
+On phones, use **Choose files**. **Choose a folder** depends on the browser's folder picker, which mobile browsers support unevenly; if it does nothing, pick the files themselves.
 
 ## Security model
 

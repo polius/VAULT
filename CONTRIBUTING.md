@@ -56,6 +56,6 @@ cd e2e && BASE_URL=http://127.0.0.1:8080 npx playwright test
 
 Maintainers only:
 
-1. Update `version` in `package.json` and move the changelog entries under a dated heading.
+1. Update `version` in `package.json`.
 2. Merge to `main`.
-3. Publish a GitHub release with the tag `vX.Y.Z` (for example `v2.1.0`, no dot after the `v`). The release workflow runs the tests, checks the tag matches `package.json`, and pushes the multi-arch image with tags `X.Y.Z`, `X.Y`, `X` and `latest`. Pre-releases (`v2.1.0-rc.1`) only get their exact tag.
+3. Publish a GitHub release with the tag `vX.Y.Z` (for example `v2.1.0`, no dot after the `v`). Its release notes are the changelog: list what changed and credit reporters there. The release workflow runs the tests, checks the tag matches `package.json`, pushes the multi-arch image with tags `X.Y.Z`, `X.Y`, `X` and `latest`, and attaches `SHA256SUMS` with the hash of every file the site serves. Pre-releases (`v2.1.0-rc.1`) only get their exact tag.

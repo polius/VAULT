@@ -1,28 +1,28 @@
-# VAULT E2E tests
+# VAULT end-to-end tests
 
-Drives **real Chromium** against the real container and round-trips a randomly
-generated file through encrypt → decrypt, verifying SHA-256 equality — once per
-sink mode (`sw`, `fs`, `blob`). Not packaged into the Docker image; tests run
-on the host.
+Playwright specs in [`tests/`](tests) drive the real app in Chromium, Firefox and WebKit: round trips through every saving method, failures, accessibility (axe), the CSP and the layout. They run on the host and are not part of the Docker image.
 
-## Run locally
+## Run them
 
 ```bash
-docker build -t vault:e2e .. && docker run -d --name vault-e2e -p 127.0.0.1:8080:80 vault:e2e
-npm ci && npx playwright install chromium
-node run.mjs --base-url=http://127.0.0.1:8080 --size=16M        # all cells
-node run.mjs --sink=sw --size=100M --base-url=http://127.0.0.1:8080   # one cell
-docker rm -f vault-e2e
+npm ci
+npx playwright install --with-deps
+npx playwright test                    # starts the dev server itself, on port 4517
+npx playwright test --project=chromium # one browser
+```
+
+CI runs the same specs against the hardened container instead of the dev server:
+
+```bash
+docker build -t vault:dev ..
+docker run -d --rm -p 127.0.0.1:8080:8080 vault:dev
+BASE_URL=http://127.0.0.1:8080 npx playwright test
 ```
 
 ## Notes
 
-- **sw / blob** capture output through Playwright's download event.
-- **fs**: the OS save dialog has no automation surface, so `showSaveFilePicker`
-  is shimmed in the page (init script + exposed binding, mirroring FileSync's
-  approach). The real `sink.js` fs branch still runs; chunks stream to Node,
-  and the captured ciphertext is fed back through a blob-mode decrypt.
-- 127.0.0.1 is a secure context, so Service Worker + File System Access APIs
-  work against the plain-HTTP container.
-- CI: the `e2e-smoke` job in `.github/workflows/tests.yml` runs all three
-  cells at 16 MB on every PR.
+- **The save dialog is shimmed.** `showSaveFilePicker` has no automation surface, so `installFsShim()` in [`tests/helpers.js`](tests/helpers.js) replaces it with a shim that streams each written chunk to Node and enforces the real writable contract (no overlapping writes, closed streams reject, aborts are recorded). The real `fs` code path in `sink.js` still runs.
+- **Downloads** from the Service Worker and in-memory methods are captured through Playwright's download event.
+- `?sink=fs|sw|blob` in the address forces one saving method for a page load.
+- `127.0.0.1` is a secure context, so the Service Worker and the crypto APIs work over plain HTTP.
+- Every test fails if the page logs an error, breaks the CSP or Trusted Types, or requests anything from another origin.
