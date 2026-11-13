@@ -121,6 +121,19 @@ test('a long name loses its middle, keeps its extension, and shortens the same i
   expect(problems).toEqual([]);
 });
 
+test('the first Tab stop skips the header to the page (audit V4)', async ({ page, problems, browserName }) => {
+  test.skip(browserName === 'webkit', 'WebKit skips links when tabbing by default');
+  await openApp(page, 'blob');
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.skip-link')).toBeFocused();
+  await expect(page.locator('.skip-link')).toBeInViewport();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#main')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#pickFilesBtn')).toBeFocused();
+  expect(problems).toEqual([]);
+});
+
 test.describe('phone', () => {
   test.use({ viewport: { width: 360, height: 640 }, hasTouch: true, isMobile: false });
 
