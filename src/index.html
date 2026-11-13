@@ -111,7 +111,7 @@
           <button type="button" class="icon-btn" id="clearBtn" aria-label="Remove selection"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
         </div>
         <details class="file-list" id="fileList" hidden>
-          <summary>Show files</summary>
+          <summary id="fileListSummary">Show files</summary>
           <ul id="fileListItems"></ul>
         </details>
         <p class="vault-info" id="vaultInfo" hidden></p>
@@ -130,10 +130,11 @@
               <span class="meter-text" id="strengthText"></span>
             </div>
             <p class="help" id="encPwdHelp">There is no password recovery. If you lose it, the file can't be opened.</p>
+            <button type="button" class="link-btn" id="genLink">Generate a strong passphrase</button>
           </div>
           <div class="generated" id="generated" hidden>
-            <svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>
-            <p>Generated passphrase, about 77 bits. <b>Store it now in a password manager.</b> It can't be recovered.</p>
+            <p class="generated-phrase" id="genPhrase"></p>
+            <p class="generated-note">6 random words, about 77 bits. <b>Store it in a password manager before you continue.</b> It can't be recovered.</p>
             <button type="button" class="btn btn-small" id="copyBtn"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button>
           </div>
           <div class="field" id="confirmField">
@@ -145,7 +146,7 @@
           </div>
           <details class="options">
             <summary>Options</summary>
-            <label class="check"><input type="checkbox" id="hideName"><span>Give the encrypted file a neutral name <span class="muted">(for example <code>vault-2026-10-25-3f9a1c.vault</code>)</span></span></label>
+            <label class="check"><input type="checkbox" id="hideName"><span>Give the encrypted file a neutral name <span class="muted">(for example <code id="hideNameExample">vault-2026-10-25-3f9a1c.vault</code>)</span></span></label>
           </details>
           <button type="submit" class="btn btn-primary btn-wide" id="encGo"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg><span>Encrypt</span></button>
         </form>

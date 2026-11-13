@@ -750,9 +750,9 @@ label {
 
 .generated {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 14px;
+  gap: 10px 14px;
   padding: 16px 16px 16px 18px;
   background: var(--lock-soft);
   border-radius: 14px;
@@ -760,8 +760,25 @@ label {
   line-height: 1.5;
 }
 
-.generated > .icon {
+/* The whole passphrase, wrapped, one tap selects all of it (audit F3). */
+.generated-phrase {
+  grid-column: 1 / -1;
+  font: 500 16px / 1.45 var(--mono);
+  overflow-wrap: anywhere;
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.link-btn {
+  justify-self: start;
+  padding: 2px 0;
+  border: 0;
+  background: none;
   color: var(--lock);
+  font: 600 14px / 1.4 var(--sans);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 summary {
@@ -1132,10 +1149,10 @@ details[open] > summary::before {
     padding: 7px 9px;
   }
   .generated {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: 1fr;
   }
   .generated .btn {
-    grid-column: 1 / -1;
+    justify-self: start;
   }
 }
 

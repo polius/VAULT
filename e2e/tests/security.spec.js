@@ -109,7 +109,7 @@ test.describe('accessibility (axe, WCAG 2.1 AA)', () => {
         document
           .getAnimations()
           .filter((a) => a.effect.getTiming().iterations !== Infinity)
-          .map((a) => a.finished),
+          .map((a) => a.finished.catch(() => {})), // a cancelled transition rejects; that's fine
       ),
     );
     await page.addScriptTag({ content: await axeSource });
@@ -138,6 +138,9 @@ test.describe('accessibility (axe, WCAG 2.1 AA)', () => {
       expect(await audit(page), 'weak warning').toEqual([]);
       await page.click('#genBtn');
       expect(await audit(page), 'generated').toEqual([]);
+      await page.click('#encGo');
+      await expect(page.locator('#messageText')).toContainText('Have you saved this passphrase?');
+      expect(await audit(page), 'passphrase not saved').toEqual([]);
       const download = page.waitForEvent('download');
       await page.click('#encGo');
       await download;

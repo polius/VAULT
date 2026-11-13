@@ -30,7 +30,7 @@ test('Tab goes from Password straight to Confirm', async ({ page, work, problems
   // The buttons beside Password stay reachable, backwards.
   if (browserName !== 'webkit') {
     await page.keyboard.press('Shift+Tab');
-    await expect(page.locator('#encShow')).toBeFocused();
+    await expect(page.locator('#genLink')).toBeFocused();
   }
   expect(problems).toEqual([]);
 });
@@ -40,10 +40,12 @@ test('a weak password needs a second, explicit click (audit M4)', async ({ page,
   const src = await makeFile(work, 'a.txt', 10);
   await pick(page, src.path);
   await page.fill('#encPwd', 'Password1!');
-  await expect(page.locator('#strengthText')).toContainText('Very weak');
+  await expect(page.locator('#strengthText')).toHaveText('Very weak · guessed instantly');
   await page.fill('#encPwd2', 'Password1!');
   await page.click('#encGo');
-  await expect(page.locator('#messageText')).toContainText('This password is very weak');
+  await expect(page.locator('#messageText')).toHaveText(
+    'This password is very weak. A well-equipped attacker could guess it instantly. Use a longer one or generate a passphrase, or encrypt anyway.',
+  );
   await expect(page.locator('#encGo')).toHaveText('Encrypt anyway');
   // Changing the password resets the gate.
   await page.fill('#encPwd', 'Password1!!');
@@ -75,9 +77,16 @@ test('a generated passphrase is shown, needs no confirmation, can be copied and 
   await expect(page.locator('#encPwd')).toHaveAttribute('type', 'text');
   await expect(page.locator('#generated')).toBeVisible();
   await expect(page.locator('#confirmField')).toBeHidden();
-  await expect(page.locator('#strengthText')).toContainText('Very strong');
+  await expect(page.locator('#strengthText')).toHaveText('Very strong · beyond any realistic guessing');
+  await expect(page.locator('#genPhrase')).toHaveText(phrase);
+  // Never copied: the first click asks whether it was saved and starts nothing (audit F1).
+  await page.click('#encGo');
+  await expect(page.locator('#messageText')).toContainText('Have you saved this passphrase?');
+  await expect(page.locator('#encGo')).toHaveText('I saved it. Encrypt');
+  await expect(page.locator('#work')).toBeHidden();
   if (browserName === 'chromium') {
-    await page.click('#copyBtn');
+    await page.bringToFront(); // clipboard writes need a focused document
+    await page.click('#messageAction');
     await expect(page.locator('#copyBtn')).toHaveText('Copied');
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(phrase);
   }
@@ -88,6 +97,33 @@ test('a generated passphrase is shown, needs no confirmation, can be copied and 
   await pick(page, file);
   await capture(page, 'blob', null, () => decrypt(page, phrase), work, 'g.out');
   await expect(page.locator('#doneTitle')).toHaveText('Decrypted');
+  expect(problems).toEqual([]);
+});
+
+test('a copied passphrase encrypts on the first click; generating again asks again (audit F1)', async ({
+  page,
+  context,
+  work,
+  problems,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'clipboard permissions are Chromium-only in Playwright');
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await openApp(page, 'blob');
+  const src = await makeFile(work, 'a.txt', 10);
+  await pick(page, src.path);
+  await page.click('#genLink');
+  await expect(page.locator('#generated')).toBeVisible();
+  await page.bringToFront(); // clipboard writes need a focused document
+  await page.click('#copyBtn');
+  await expect(page.locator('#copyBtn')).toHaveText('Copied');
+  await page.click('#genBtn');
+  await page.click('#encGo');
+  await expect(page.locator('#messageText')).toContainText('Have you saved this passphrase?');
+  // Editing the field drops the generated state and the question with it.
+  await page.fill('#encPwd', STRONG);
+  await expect(page.locator('#generated')).toBeHidden();
+  await expect(page.locator('#encGo')).toHaveText('Encrypt');
   expect(problems).toEqual([]);
 });
 
@@ -176,6 +212,18 @@ test.describe('phone layout', () => {
     await page.click('#encGo');
     await expect(page.locator('#message')).toBeVisible();
     expect(await overflow()).toBeLessThanOrEqual(0);
+    expect(problems).toEqual([]);
+  });
+
+  test('a generated passphrase is fully visible (audit F3)', async ({ page, work, problems }) => {
+    await openApp(page, 'blob');
+    const src = await makeFile(work, 'a.txt', 10);
+    await pick(page, src.path);
+    await page.click('#genBtn');
+    const phrase = page.locator('#genPhrase');
+    await expect(phrase).toHaveText(/^[a-z]+(-[a-z]+){5}$/);
+    expect(await phrase.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    expect(await phrase.evaluate((el) => el.getBoundingClientRect().right <= window.innerWidth)).toBe(true);
     expect(problems).toEqual([]);
   });
 });

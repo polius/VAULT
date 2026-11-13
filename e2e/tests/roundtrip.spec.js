@@ -44,7 +44,9 @@ for (const sink of ['sw', 'fs', 'blob']) {
       await writeFile(vaultPath, enc.bytes);
       await page.click('#againBtn');
       await pick(page, vaultPath);
-      await expect(page.locator('#vaultInfo')).toContainText('format 3');
+      await expect(page.locator('#vaultInfo')).toHaveText(
+        'A VAULT file. Enter its password to open it. Its original name and size stay hidden until then.',
+      );
       const dec = await capture(page, sink, fsCap, () => decrypt(page, STRONG), work, 'b.out');
       expect(savedName(dec)).toBe('Quarterly report ü.pdf');
       expect(sha256(dec.bytes)).toBe(src.hash);

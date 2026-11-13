@@ -12,9 +12,9 @@ import {
   safeFileName,
 } from './files.js';
 import { E, encrypt, encryptedSize, fileSource, inspect, unlock } from './format.js';
-import { generatePassphrase } from './passphrase.js';
+import { generatePassphrase, passphraseBits } from './passphrase.js';
 import { openSink, preferredMode, registerServiceWorker, sweepLegacyStaging } from './sink.js';
-import { describeCrackTime, estimate, loadDictionaries } from './strength.js';
+import { attackerSentence, estimate, loadDictionaries, meterPhrase, rate } from './strength.js';
 import { planZip, zipStream } from './zip.js';
 
 // Above this, the in-memory fallback sink asks before continuing.
@@ -43,6 +43,7 @@ const ui = Object.fromEntries(
     'selMeta',
     'clearBtn',
     'fileList',
+    'fileListSummary',
     'fileListItems',
     'vaultInfo',
     'encForm',
@@ -51,12 +52,15 @@ const ui = Object.fromEntries(
     'encShow',
     'meter',
     'strengthText',
+    'genLink',
     'generated',
+    'genPhrase',
     'copyBtn',
     'confirmField',
     'encPwd2',
     'confirmHelp',
     'hideName',
+    'hideNameExample',
     'encGo',
     'decForm',
     'decPwd',
@@ -90,7 +94,8 @@ const state = {
   infoError: null, // why the selection can't be decrypted
   mode: 'encrypt',
   generated: null, // the generated passphrase, while unchanged
-  proceed: null, // 'weak' | 'memory': the next click on the same action continues anyway
+  saved: false, // the generated passphrase was copied out of the page
+  proceed: null, // 'unsaved' | 'weak' | 'memory': the next click on the same action continues anyway
   session: null, // unlocked decrypt session waiting for a save location
   controller: null,
   sink: null,
@@ -199,14 +204,21 @@ function explain(err, context) {
 function makeProgress(verb) {
   let started = 0;
   let painted = 0;
+  let slowNote = 0;
   const phase = (p) => {
     const kdf = p === 'kdf';
     ui.progress.classList.toggle('indeterminate', kdf);
+    clearTimeout(slowNote);
     if (kdf) {
       ui.workPhase.textContent =
         verb === 'Encrypting' ? 'Deriving a key from your password…' : 'Checking the password…';
       ui.workPct.textContent = '';
-      ui.workStats.textContent = 'This takes a moment on purpose: it makes guessing passwords slow.';
+      ui.workStats.textContent = '';
+      // Only worth reading if the phase lasts long enough to read it.
+      slowNote = setTimeout(() => {
+        if (state.view === 'work' && ui.progress.classList.contains('indeterminate'))
+          ui.workStats.textContent = 'This takes a moment on purpose: it makes guessing passwords slow.';
+      }, 500);
       ui.progress.removeAttribute('aria-valuenow');
       ui.progress.removeAttribute('aria-valuetext');
       ui.progressFill.style.width = '';
@@ -247,7 +259,7 @@ function renderSelection() {
   ui.selName.textContent = single ? files[0].file.name : archiveName(state.selection).replace(/\.zip$/, '');
   ui.selName.title = ui.selName.textContent;
   const parts = single
-    ? [formatBytes(total)]
+    ? [state.info ? `${formatBytes(total)} encrypted` : formatBytes(total)]
     : [`${files.length} file${files.length === 1 ? '' : 's'}`, formatBytes(total), 'packed into one ZIP'];
   if (dirs.length) parts.splice(1, 0, `${dirs.length} empty folder${dirs.length === 1 ? '' : 's'}`);
   ui.selMeta.textContent = parts.join(' · ');
@@ -255,6 +267,7 @@ function renderSelection() {
 
   ui.fileList.hidden = single;
   ui.fileList.open = false;
+  ui.fileListSummary.textContent = 'Show files';
   ui.fileListItems.replaceChildren(
     ...files.slice(0, MAX_LISTED_FILES).map((f) => {
       const li = document.createElement('li');
@@ -282,10 +295,10 @@ function renderVaultInfo() {
     el.className = 'vault-info help error';
     return;
   }
-  const { version, legacy, kdf } = state.info;
+  const { version, legacy } = state.info;
   el.className = 'vault-info';
   if (version === 3) {
-    el.textContent = `Encrypted with VAULT · format 3 · ${kdf}. The original name and size stay hidden until you unlock it.`;
+    el.textContent = 'A VAULT file. Enter its password to open it. Its original name and size stay hidden until then.';
   } else {
     el.textContent =
       `Encrypted with VAULT 1.x (format ${version}) · original name ${legacy.name} · ${formatBytes(legacy.size)}. ` +
@@ -309,6 +322,7 @@ function setMode(mode) {
   ui.decForm.hidden = mode !== 'decrypt';
   ui.decGo.disabled = Boolean(state.infoError);
   setButtonLabel(ui.encGo, encryptLabel());
+  ui.hideNameExample.textContent = neutralName();
   renderVaultInfo();
   setMessage(null);
 }
@@ -360,6 +374,7 @@ function clearSecrets() {
   ui.encPwd2.value = '';
   ui.decPwd.value = '';
   state.generated = null;
+  state.saved = false;
   state.session = null;
   setShown(ui.encShow, [ui.encPwd, ui.encPwd2], false);
   setShown(ui.decShow, [ui.decPwd], false);
@@ -391,13 +406,13 @@ function setShown(btn, inputs, shown) {
 
 function updateStrength() {
   const pw = ui.encPwd.value;
-  const e = estimate(pw, state.dicts);
+  const e = pw && pw === state.generated ? rate(passphraseBits()) : estimate(pw, state.dicts);
   ui.meter.hidden = !e;
   if (!e) return;
   ui.meter.dataset.score = String(e.score);
   const label = document.createElement('b');
   label.textContent = e.label;
-  ui.strengthText.replaceChildren(label, ` · ${describeCrackTime(e.crackSeconds)} to guess`);
+  ui.strengthText.replaceChildren(label, ` · ${meterPhrase(e.crackSeconds)}`);
 }
 
 function updateConfirm(final = false) {
@@ -421,11 +436,15 @@ function updateConfirm(final = false) {
 }
 
 function updateEncryptFields() {
-  if (state.generated && ui.encPwd.value !== state.generated) state.generated = null;
+  if (state.generated && ui.encPwd.value !== state.generated) {
+    state.generated = null;
+    state.saved = false;
+  }
   ui.generated.hidden = !state.generated;
+  ui.genPhrase.textContent = state.generated ?? '';
   ui.confirmField.hidden = Boolean(state.generated);
   ui.encPwd.removeAttribute('aria-invalid');
-  if (state.proceed === 'weak') {
+  if (state.proceed === 'weak' || state.proceed === 'unsaved') {
     state.proceed = null;
     setMessage(null);
     setButtonLabel(ui.encGo, encryptLabel());
@@ -443,6 +462,27 @@ async function ensureDictionaries() {
     console.warn('Password dictionaries failed to load:', err);
   }
   return state.dicts;
+}
+
+const isMac = /Mac|iPhone|iPad/.test(navigator.userAgentData?.platform ?? navigator.platform ?? '');
+
+async function copyPassphrase() {
+  const label = ui.copyBtn.querySelector('span');
+  try {
+    await navigator.clipboard.writeText(ui.encPwd.value);
+    state.saved = true;
+    label.textContent = 'Copied';
+    announce('Passphrase copied to the clipboard.');
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents(ui.genPhrase);
+    getSelection().removeAllRanges();
+    getSelection().addRange(range);
+    label.textContent = isMac ? 'Press ⌘C' : 'Press Ctrl+C';
+  }
+  setTimeout(() => {
+    label.textContent = 'Copy';
+  }, 2500);
 }
 
 // ---------- running a job ----------
@@ -543,12 +583,25 @@ async function startEncrypt() {
     announce(ui.confirmHelp.textContent);
     return;
   }
+  // A generated passphrase skips the confirmation field, so ask once whether it
+  // was stored: VAULT forgets it the moment the run ends (audit F1).
+  if (state.generated && !state.saved && state.proceed !== 'unsaved') {
+    state.proceed = 'unsaved';
+    setMessage(
+      'warn',
+      'Have you saved this passphrase? VAULT forgets it as soon as the file is encrypted, and nobody can recover it.',
+      { label: 'Copy passphrase', run: copyPassphrase },
+    );
+    setButtonLabel(ui.encGo, 'I saved it. Encrypt');
+    announce(ui.messageText.textContent);
+    return;
+  }
   const strength = estimate(password, await ensureDictionaries());
   if (strength.weak && state.proceed !== 'weak') {
     state.proceed = 'weak';
     setMessage(
       'warn',
-      `This password is ${strength.label.toLowerCase()}. A well-equipped attacker could guess it in ${describeCrackTime(strength.crackSeconds)}. Use a longer one or generate a passphrase, or encrypt anyway.`,
+      `This password is ${strength.label.toLowerCase()}. ${attackerSentence(strength.crackSeconds)} Use a longer one or generate a passphrase, or encrypt anyway.`,
     );
     setButtonLabel(ui.encGo, 'Encrypt anyway');
     announce(ui.messageText.textContent);
@@ -723,9 +776,14 @@ function wire() {
     input.addEventListener('change', () => {
       const selection = fromFileList(input.files);
       input.value = '';
-      if (selection.files.length) select(selection);
+      // An empty folder picked with the button arrives as no files at all.
+      if (selection.files.length || input === ui.pickFolder) select(selection);
     });
   }
+
+  ui.fileList.addEventListener('toggle', () => {
+    ui.fileListSummary.textContent = ui.fileList.open ? 'Hide files' : 'Show files';
+  });
 
   ui.clearBtn.addEventListener('click', reset);
   ui.againBtn.addEventListener('click', reset);
@@ -753,32 +811,27 @@ function wire() {
     if (!ui.message.hidden && state.resume === null) setMessage(null);
   });
 
-  ui.genBtn.addEventListener('click', async () => {
+  const generate = async () => {
     const phrase = await generatePassphrase();
     ui.encPwd.value = phrase;
     ui.encPwd2.value = '';
     state.generated = phrase;
+    state.saved = false;
     setShown(ui.encShow, [ui.encPwd, ui.encPwd2], true);
     updateEncryptFields();
     ui.encPwd.focus();
-    announce('Passphrase generated and shown in the password field. Store it before you continue.');
-  });
+    announce('Passphrase generated and shown below the password field. Store it before you continue.');
+  };
+  ui.genBtn.addEventListener('click', generate);
+  ui.genLink.addEventListener('click', generate);
 
-  ui.copyBtn.addEventListener('click', async () => {
-    const label = ui.copyBtn.querySelector('span');
-    try {
-      await navigator.clipboard.writeText(ui.encPwd.value);
-      label.textContent = 'Copied';
-      announce('Passphrase copied to the clipboard.');
-    } catch {
-      ui.encPwd.focus();
-      ui.encPwd.select();
-      label.textContent = 'Press Ctrl+C';
-    }
-    setTimeout(() => {
-      label.textContent = 'Copy';
-    }, 2500);
-  });
+  ui.copyBtn.addEventListener('click', copyPassphrase);
+  // Copying by hand counts as storing it too.
+  for (const el of [ui.encPwd, ui.genPhrase]) {
+    el.addEventListener('copy', () => {
+      if (state.generated) state.saved = true;
+    });
+  }
 
   ui.encForm.addEventListener('submit', (e) => {
     e.preventDefault();
