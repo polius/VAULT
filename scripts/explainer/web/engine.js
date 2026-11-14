@@ -207,11 +207,13 @@
 
   // ---- capture API --------------------------------------------------------------
   async function loadMark() {
-    // the mark, straight from the app: a mask (the weave) and the strand
+    // the icon, straight from the app: as a symbol (#mark), and its two halves for the opening
     const text = await (await fetch("/src/assets/logo.svg")).text();
     const src = new DOMParser().parseFromString(text, "image/svg+xml").documentElement;
-    const sym = svg("symbol", { id: "knot", viewBox: "0 0 32 32" }, document.getElementById("sprite"));
-    for (const n of [...src.children]) if (n.tagName === "mask" || n.tagName === "g") sym.appendChild(document.importNode(n, true));
+    const sym = svg("symbol", { id: "mark", viewBox: src.getAttribute("viewBox") }, document.getElementById("sprite"));
+    for (const n of [...src.children]) if (n.tagName !== "title" && n.tagName !== "style") sym.appendChild(document.importNode(n, true));
+    const halves = [...src.querySelectorAll("path")];
+    APP.shield = { d: halves[0].getAttribute("d"), fills: halves.map((h) => h.getAttribute("fill")) };
   }
 
   window.__init = function (data) {

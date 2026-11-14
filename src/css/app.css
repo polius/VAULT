@@ -2,7 +2,8 @@
    banknotes and passports.
 
    The rules: one ink. The green means sealed, and it appears on the seal, on
-   the one button that makes a seal, and on the word that names the state;
+   the one button that makes a seal, and on the word that names the state (the
+   icon, a blue and green shield, is the one exception);
    focus rings and the strength meter use the text colour. The seal is the only
    ornament: every .vault file has its own, drawn from the salt in its header,
    and it is engraved while the file encrypts. One type family in three widths:
@@ -238,21 +239,21 @@ code {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   color: var(--ink);
   text-decoration: none;
 }
 
+/* The shield keeps its own two colours in both themes. */
 .logo {
-  width: 27px;
-  height: 27px;
+  width: 32px;
+  height: 32px;
   flex: none;
-  color: var(--seal);
 }
 
 .wordmark {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 16px;
   font-stretch: 125%;
   letter-spacing: 0.2em;
 }

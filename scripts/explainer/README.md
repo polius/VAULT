@@ -20,10 +20,10 @@ Design rules the film follows, so any future edit stays on-model:
   from a real run (a file is encrypted, then decrypted). The film only moves
   what moves, with the arithmetic of `src/js/seal.js`: the percentage, the
   line under it, and the seal's ink and rings.
-- **The seal carries the story.** The film opens on one strand being drawn,
-  woven into the mark, and a seal growing around it. Encrypting draws a seal
-  and presses it; decrypting turns its rings back and breaks it; the end card
-  presses one last seal.
+- **The seal carries the story.** The film opens on the two halves of the
+  shield locking together and a seal growing around them. Encrypting draws a
+  seal and presses it; decrypting turns its rings back and breaks it; the end
+  card presses one last seal.
 - **Fine lines behind everything.** A medallion of guilloche rings frames the
   picture, like the ground of a banknote. It drifts, and turns a notch at
   every cut. Cuts are plain: one sheet lifts away, the next settles.
@@ -53,7 +53,7 @@ in a loop.
 Scene arc, timed to the narration:
 
 ```
-open (strand, mark, seal, name)  →  demo (encrypt, the seal is drawn)  →  local
+open (shield, seal, name)  →  demo (encrypt, the seal is drawn)  →  local
      →  inside (Argon2id, AES-GCM)  →  share  →  decrypt (the seal breaks)
      →  selfhost  →  outro
 ```
