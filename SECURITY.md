@@ -39,7 +39,7 @@ Only the latest release is supported.
 Every release has a `SHA256SUMS` file listing the SHA-256 of each file the site serves. To check that a VAULT deployment, yours or someone else's, serves exactly the released files (set the version and the address):
 
 ```bash
-V=v2.0.3; SITE=https://vault.example.com
+V=v2.1.0; SITE=https://vault.example.com
 curl -fsSL "https://github.com/polius/vault/releases/download/$V/SHA256SUMS" -o SHA256SUMS
 while read -r sum file; do [ "$(curl -fsS "$SITE/$file" | shasum -a 256 | cut -d' ' -f1)" = "$sum" ] && echo "ok        $file" || echo "DIFFERENT $file"; done < SHA256SUMS
 ```
