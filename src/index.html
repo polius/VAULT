@@ -14,10 +14,26 @@
   <meta property="og:title" content="VAULT">
   <meta property="og:description" content="Encrypt and decrypt files with a password, entirely in your browser. Nothing is uploaded.">
   <meta property="og:type" content="website">
+  <meta property="og:image" content="assets/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="The VAULT shield, half blue and half green, next to “Lock a file with a password. It never leaves this device.”">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="css/app.css">
   <script src="js/theme.js"></script>
   <script type="module" src="js/app.js"></script>
+  <!-- app.js imports these; fetch them now instead of one level at a time -->
+  <link rel="modulepreload" href="js/files.js">
+  <link rel="modulepreload" href="js/format.js">
+  <link rel="modulepreload" href="js/kdf.js">
+  <link rel="modulepreload" href="js/passphrase.js">
+  <link rel="modulepreload" href="js/sink.js">
+  <link rel="modulepreload" href="js/strength.js">
+  <link rel="modulepreload" href="js/tt.js">
+  <link rel="modulepreload" href="js/zip.js">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to VAULT</a>

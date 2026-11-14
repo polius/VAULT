@@ -69,7 +69,7 @@ URL.createObjectURL = (b) => {
 const revoked = [];
 URL.revokeObjectURL = (u) => revoked.push(u);
 
-const { openSink, sinkState, preferredMode } = await import('../src/js/sink.js');
+const { openSink, sinkState, preferredMode, readOverride } = await import('../src/js/sink.js');
 
 const tick = (ms = 20) => new Promise((r) => realSetTimeout(r, ms));
 
@@ -288,5 +288,28 @@ describe('fallback chain', () => {
     } finally {
       sinkState.forced = null;
     }
+  });
+});
+
+describe('?sink= override (audit E2)', () => {
+  const at = (href) => readOverride(new URL(href));
+
+  it('applies on local addresses', () => {
+    assert.equal(at('http://localhost:8080/?sink=blob'), 'blob');
+    assert.equal(at('http://127.0.0.1:4517/?sink=sw'), 'sw');
+    assert.equal(at('http://[::1]:8080/?sink=fs'), 'fs');
+  });
+
+  it('is ignored on any other host', () => {
+    assert.equal(at('https://vault.example.com/?sink=blob'), null);
+    assert.equal(at('https://localhost.example.com/?sink=blob'), null);
+    assert.equal(at('http://127.0.0.2/?sink=blob'), null);
+    assert.equal(at('http://192.168.1.10/?sink=blob'), null);
+  });
+
+  it('ignores unknown modes and a missing location', () => {
+    assert.equal(at('http://localhost/?sink=disk'), null);
+    assert.equal(at('http://localhost/'), null);
+    assert.equal(readOverride(undefined), null);
   });
 });
