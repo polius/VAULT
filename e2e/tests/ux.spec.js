@@ -93,7 +93,9 @@ test('a pasted file is selected, pasted text stays text, and Escape leaves an un
       const dt = new DataTransfer();
       if (withFile) dt.items.add(new File(['hello'], 'pasted.txt', { type: 'text/plain' }));
       else dt.setData('text/plain', 'just text');
-      const e = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true });
+      const e = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      // Firefox drops a script-made clipboardData passed to the constructor.
+      Object.defineProperty(e, 'clipboardData', { value: dt });
       document.body.dispatchEvent(e);
       return e.defaultPrevented;
     }, withFile);

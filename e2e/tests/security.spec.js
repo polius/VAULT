@@ -137,6 +137,9 @@ test.describe('accessibility (axe, WCAG 2.1 AA)', () => {
       await page.click('#encGo');
       expect(await audit(page), 'weak warning').toEqual([]);
       await page.click('#genBtn');
+      // Generating is async: wait for the result, or axe catches the button mid-change.
+      await expect(page.locator('#generated')).toBeVisible();
+      await expect(page.locator('#encGo')).toHaveClass(/btn-lock/);
       expect(await audit(page), 'generated').toEqual([]);
       await page.click('#encGo');
       await expect(page.locator('#messageText')).toContainText('Have you saved this passphrase?');
