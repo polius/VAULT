@@ -104,11 +104,11 @@ There is no password recovery. If you lose the password, the data is gone.
 
 VAULT works in current Chrome, Edge, Firefox and Safari. How the result is saved depends on the browser:
 
-| Browser | How the result is saved | Size limit |
-|---|---|---|
-| Chrome, Edge and other Chromium browsers on a computer | A save dialog, then written straight to the file you chose | None in practice |
-| Firefox, Safari, and Chrome on Android | Streamed to the browser's downloads through a Service Worker | None in practice |
-| Any browser where neither works (for example with the Service Worker blocked or bypassed) | Held in memory, then offered as a download | VAULT warns above 512 MB; the device's memory is the limit |
+| Browser                                                                                   | How the result is saved                                      | Size limit                                                 |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| Chrome, Edge and other Chromium browsers on a computer                                    | A save dialog, then written straight to the file you chose   | None in practice                                           |
+| Firefox, Safari, and Chrome on Android                                                    | Streamed to the browser's downloads through a Service Worker | None in practice                                           |
+| Any browser where neither works (for example with the Service Worker blocked or bypassed) | Held in memory, then offered as a download                   | VAULT warns above 512 MB; the device's memory is the limit |
 
 On phones, use **Choose files**. **Choose a folder** depends on the browser's folder picker, which mobile browsers support unevenly; if it does nothing, pick the files themselves.
 
