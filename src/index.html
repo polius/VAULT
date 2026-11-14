@@ -9,8 +9,8 @@
   <title>VAULT · Encrypt files in your browser</title>
   <meta name="description" content="Encrypt and decrypt files with a password, entirely in your browser. Nothing is uploaded.">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f4f4f0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#101214" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="VAULT">
   <meta property="og:description" content="Encrypt and decrypt files with a password, entirely in your browser. Nothing is uploaded.">
   <meta property="og:type" content="website">
@@ -20,75 +20,78 @@
   <script type="module" src="js/app.js"></script>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to VAULT</a>
   <svg class="sprite" aria-hidden="true" focusable="false">
     <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10.5" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></symbol>
     <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10.5" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 7.6-1.8"/></symbol>
-    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 15v3.5A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V15"/></symbol>
-    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.6l2 2h7.4A2.5 2.5 0 0 1 21 9.5v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/></symbol>
     <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 3v5h5"/></symbol>
     <symbol id="i-files" viewBox="0 0 24 24"><path d="M15 2.5H9.5A2.5 2.5 0 0 0 7 5v10a2.5 2.5 0 0 0 2.5 2.5h7A2.5 2.5 0 0 0 19 15V6.5z"/><path d="M15 2.5v4h4"/><path d="M4 7.5V18a3 3 0 0 0 3 3h8"/></symbol>
-    <symbol id="i-vault" viewBox="0 0 24 24"><path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 3v5h5"/><rect x="9" y="13" width="6" height="4.5" rx="1"/><path d="M10.5 13v-1.2a1.5 1.5 0 0 1 3 0V13"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
     <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
     <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3.5 3.5l17 17"/><path d="M10.4 5.6A9 9 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16 16 0 0 1-2.9 3.7M6.6 6.9C4 8.6 2.5 12 2.5 12S6 18.5 12 18.5a8.7 8.7 0 0 0 4.6-1.3"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
     <symbol id="i-dice" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><circle cx="8.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.3" fill="currentColor" stroke="none"/></symbol>
-    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11.5" height="11.5" rx="2.5"/><path d="M15 9V6a2.5 2.5 0 0 0-2.5-2.5h-6A2.5 2.5 0 0 0 4 6v6a2.5 2.5 0 0 0 2.5 2.5H9"/></symbol>
-    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
     <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4"/><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></symbol>
-    <symbol id="i-github" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.54-3.88-1.54-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></symbol>
   </svg>
 
   <div class="drop-overlay" id="dropOverlay" hidden>
-    <div class="drop-overlay-card"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-upload"/></svg><span>Drop to add</span></div>
+    <p class="drop-overlay-text" id="dropText">Drop to choose</p>
   </div>
 
   <header class="topbar">
     <a class="brand" href="./" aria-label="VAULT home">
-      <img src="assets/logo.svg" alt="" width="36" height="36">
+      <img src="assets/logo.svg" alt="" width="22" height="22">
       <span class="wordmark">VAULT</span>
     </a>
     <div class="topbar-end">
-      <fieldset class="theme-switch">
-        <legend class="visually-hidden">Theme</legend>
-        <button type="button" data-theme-set="auto" aria-pressed="true">Auto</button>
-        <button type="button" data-theme-set="light" aria-pressed="false">Light</button>
-        <button type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
-      </fieldset>
-      <a class="icon-link" href="https://github.com/polius/vault" rel="noopener" target="_blank" title="Source code on GitHub">
-        <svg class="icon" aria-hidden="true"><use href="#i-github"/></svg><span class="visually-hidden">Source code on GitHub</span>
-      </a>
+      <button type="button" class="text-btn" id="themeBtn" data-theme-cycle>Theme: <span data-theme-name>Auto</span></button>
+      <a class="text-link" href="https://github.com/polius/vault" rel="noopener" target="_blank">Source</a>
     </div>
   </header>
 
-  <main class="page" id="main">
+  <main class="page" id="main" data-view="pick" tabindex="-1">
     <div class="intro">
-      <h1>Encrypt files locally</h1>
-      <p class="lede">Lock any file or folder with a password. Nothing is ever uploaded.</p>
+      <h1>Lock a file with a password.</h1>
+      <p class="lede">It never leaves this device.</p>
     </div>
 
-    <section class="panel" id="insecure" hidden aria-labelledby="insecureTitle">
+    <section id="insecure" hidden aria-labelledby="insecureTitle">
       <div class="notice notice-error" role="alert">
         <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg>
         <div>
-          <h2 id="insecureTitle">VAULT needs a secure connection</h2>
+          <h1 id="insecureTitle">VAULT needs a secure connection</h1>
           <p>Browsers only provide the encryption tools VAULT uses on HTTPS pages or on <code>localhost</code>. This page was opened over plain HTTP, so it can't encrypt or decrypt anything.</p>
           <p>Open it over HTTPS instead. If you host VAULT yourself, the <a href="https://github.com/polius/vault#run-it-with-https" rel="noopener" target="_blank">HTTPS setup guide</a> takes about five minutes.</p>
         </div>
       </div>
     </section>
 
-    <section class="panel" id="app" aria-label="Encrypt or decrypt">
+    <section class="app" id="app" aria-label="Encrypt or decrypt" data-mode="encrypt">
+      <!-- The file bar: drop target, selection, progress and result in one object. -->
+      <h1 class="state-title" id="stateTitle" tabindex="-1" hidden>Encrypt</h1>
+      <div class="bar" id="bar" data-state="empty">
+        <button type="button" class="bar-pick" id="pickFilesBtn"><span class="fine">Choose files, or drop them here</span><span class="coarse">Choose files</span></button>
+        <div class="bar-face" id="barFace">
+          <svg class="icon bar-glyph" id="selIcon" aria-hidden="true"><use href="#i-file"/></svg>
+          <span class="bar-name" id="selName" dir="auto"></span>
+          <span class="bar-meta" id="selMeta"></span>
+        </div>
+        <div class="bar-fill" id="progressFill" aria-hidden="true">
+          <div class="bar-face">
+            <svg class="icon bar-glyph" id="fillIcon" aria-hidden="true"><use href="#i-file"/></svg>
+            <span class="bar-name" id="fillName" dir="auto"></span>
+            <span class="bar-meta" id="fillMeta"></span>
+          </div>
+        </div>
+        <div class="bar-progress" id="progress" role="progressbar" aria-labelledby="workPhase" aria-valuemin="0" aria-valuemax="100" hidden></div>
+        <button type="button" class="icon-btn bar-clear" id="clearBtn" aria-label="Remove selection" title="Remove selection"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+      </div>
+
       <!-- 1. Empty: pick or drop -->
       <div class="pick" id="pick">
-        <div class="dropzone" id="dropzone">
-          <svg class="icon icon-xl" aria-hidden="true"><use href="#i-upload"/></svg>
-          <p class="dropzone-title"><span class="fine">Drop files or a folder here</span><span class="coarse">Choose what to protect</span></p>
-          <p class="dropzone-sub"><span class="fine">Drop</span><span class="coarse">Pick</span> a <b>.vault</b> file to decrypt it.</p>
-          <div class="pick-buttons">
-            <button type="button" class="btn btn-primary" id="pickFilesBtn"><svg class="icon" aria-hidden="true"><use href="#i-files"/></svg>Choose files</button>
-            <button type="button" class="btn btn-secondary" id="pickFolderBtn"><svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg>Choose a folder</button>
-          </div>
+        <div class="pick-row">
+          <button type="button" class="link-btn" id="pickFolderBtn">Choose a folder</button>
+          <span class="muted"><span class="fine">Drop</span><span class="coarse">Pick</span> a <b>.vault</b> file to decrypt it.</span>
         </div>
         <p class="pick-error help error" id="pickError" role="alert" hidden></p>
         <input type="file" id="pickFiles" multiple class="visually-hidden" tabindex="-1" aria-hidden="true">
@@ -97,21 +100,8 @@
 
       <!-- 2. Selected: configure -->
       <div class="job" id="job" hidden>
-        <div class="mode" role="radiogroup" aria-label="What to do">
-          <label class="mode-opt mode-enc"><input type="radio" name="mode" value="encrypt" id="modeEnc"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>Encrypt</label>
-          <label class="mode-opt mode-dec"><input type="radio" name="mode" value="decrypt" id="modeDec"><svg class="icon" aria-hidden="true"><use href="#i-unlock"/></svg>Decrypt</label>
-        </div>
-
-        <div class="selection">
-          <svg class="icon icon-lg selection-icon" id="selIcon" aria-hidden="true"><use href="#i-file"/></svg>
-          <div class="selection-text">
-            <span class="selection-name" id="selName"></span>
-            <span class="selection-meta" id="selMeta"></span>
-          </div>
-          <button type="button" class="icon-btn" id="clearBtn" aria-label="Remove selection"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
-        </div>
         <details class="file-list" id="fileList" hidden>
-          <summary>Show files</summary>
+          <summary id="fileListSummary">Show files</summary>
           <ul id="fileListItems"></ul>
         </details>
         <p class="vault-info" id="vaultInfo" hidden></p>
@@ -119,81 +109,85 @@
         <form id="encForm" class="form" novalidate hidden>
           <input type="text" name="username" autocomplete="username" value="VAULT file" class="visually-hidden" tabindex="-1" aria-hidden="true">
           <div class="field">
-            <label for="encPwd">Password</label>
+            <div class="label-row">
+              <label for="encPwd">Password</label>
+              <span class="caps" id="encCaps" hidden>Caps Lock is on</span>
+              <button type="button" class="link-btn" id="genLink">Generate a strong passphrase</button>
+            </div>
             <div class="input-row">
-              <input type="password" id="encPwd" name="password" autocomplete="new-password" spellcheck="false" autocapitalize="off" aria-describedby="encPwdHelp strengthText">
+              <input type="password" id="encPwd" name="password" autocomplete="new-password" spellcheck="false" autocapitalize="off" aria-describedby="strengthText encPwdHelp">
               <button type="button" class="icon-btn" id="genBtn" aria-label="Generate a passphrase" title="Generate a passphrase"><svg class="icon" aria-hidden="true"><use href="#i-dice"/></svg></button>
               <button type="button" class="icon-btn" id="encShow" aria-label="Show password" aria-pressed="false" title="Show password"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button>
             </div>
-            <div class="meter" id="meter" hidden>
+            <div class="meter" id="meter" data-empty="true">
               <div class="meter-bar" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
               <span class="meter-text" id="strengthText"></span>
             </div>
             <p class="help" id="encPwdHelp">There is no password recovery. If you lose it, the file can't be opened.</p>
           </div>
           <div class="generated" id="generated" hidden>
-            <svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>
-            <p>Generated passphrase, about 77 bits. <b>Store it now in a password manager.</b> It can't be recovered.</p>
-            <button type="button" class="btn btn-small" id="copyBtn"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button>
+            <p class="generated-phrase" id="genPhrase"></p>
+            <p class="generated-note">6 random words, about 77 bits. <b>Store it in a password manager before you continue.</b> It can't be recovered.</p>
+            <button type="button" class="btn btn-small" id="copyBtn"><span>Copy</span></button>
           </div>
           <div class="field" id="confirmField">
             <label for="encPwd2">Confirm password</label>
             <div class="input-row">
               <input type="password" id="encPwd2" name="confirm" autocomplete="new-password" spellcheck="false" autocapitalize="off" aria-describedby="confirmHelp">
             </div>
-            <p class="help" id="confirmHelp"></p>
+            <p class="help reserve" id="confirmHelp"></p>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-lock" id="encGo"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg><span>Encrypt</span></button>
+            <span class="action-note" id="saveAs"></span>
           </div>
           <details class="options">
             <summary>Options</summary>
-            <label class="check"><input type="checkbox" id="hideName"><span>Give the encrypted file a neutral name <span class="muted">(for example <code>vault-2026-10-25-3f9a1c.vault</code>)</span></span></label>
+            <label class="check"><input type="checkbox" id="hideName"><span>Give the encrypted file a neutral name <span class="muted">(for example <code id="hideNameExample">vault-2026-10-25-3f9a1c.vault</code>)</span></span></label>
           </details>
-          <button type="submit" class="btn btn-primary btn-wide" id="encGo"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg><span>Encrypt</span></button>
         </form>
 
         <form id="decForm" class="form" novalidate hidden>
           <input type="text" name="username" autocomplete="username" value="VAULT file" class="visually-hidden" tabindex="-1" aria-hidden="true">
           <div class="field">
-            <label for="decPwd">Password</label>
+            <div class="label-row">
+              <label for="decPwd">Password</label>
+              <span class="caps" id="decCaps" hidden>Caps Lock is on</span>
+            </div>
             <div class="input-row">
               <input type="password" id="decPwd" name="password" autocomplete="current-password" spellcheck="false" autocapitalize="off">
               <button type="button" class="icon-btn" id="decShow" aria-label="Show password" aria-pressed="false" title="Show password"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button>
             </div>
           </div>
-          <button type="submit" class="btn btn-unlock btn-wide" id="decGo"><svg class="icon" aria-hidden="true"><use href="#i-unlock"/></svg><span>Decrypt</span></button>
+          <div class="actions">
+            <button type="submit" class="btn btn-unlock" id="decGo"><svg class="icon" aria-hidden="true"><use href="#i-unlock"/></svg><span>Decrypt</span></button>
+            <span class="action-note" id="decNote">reveals the original name</span>
+          </div>
         </form>
 
         <div class="notice" id="message" hidden>
           <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg>
           <div><p id="messageText"></p><button type="button" class="btn btn-small" id="messageAction" hidden></button></div>
         </div>
+
+        <button type="button" class="link-btn switch-mode" id="switchMode" hidden></button>
       </div>
 
-      <!-- 3. Working -->
+      <!-- 3. Working: the bar fills; the form gives way to a status line -->
       <div class="work" id="work" hidden>
-        <div class="work-head">
-          <span class="work-phase" id="workPhase">Starting…</span>
-          <span class="work-pct" id="workPct" aria-hidden="true"></span>
-        </div>
-        <div class="progress" id="progress" role="progressbar" aria-labelledby="workPhase" aria-valuemin="0" aria-valuemax="100">
-          <div class="progress-fill" id="progressFill"></div>
-        </div>
+        <p class="work-line"><span class="work-phase" id="workPhase">Starting…</span> <span class="work-pct" id="workPct" aria-hidden="true"></span></p>
         <p class="work-stats" id="workStats"></p>
-        <button type="button" class="btn btn-secondary" id="cancelBtn"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>Cancel</button>
+        <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
       </div>
 
-      <!-- 4. Done -->
+      <!-- 4. Done: the bar is the result -->
       <div class="done" id="done" hidden>
-        <div class="done-badge"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-check"/></svg></div>
-        <h2 id="doneTitle" tabindex="-1">Done</h2>
-        <div class="done-file">
-          <svg class="icon icon-lg done-file-icon" id="doneIcon" aria-hidden="true"><use href="#i-vault"/></svg>
-          <div class="done-file-text">
-            <p class="done-name" id="doneName"></p>
-            <p class="done-meta" id="doneMeta"></p>
-          </div>
-        </div>
+        <p class="done-meta" id="doneMeta"></p>
         <div class="done-detail" id="doneDetail"></div>
-        <button type="button" class="btn btn-secondary" id="againBtn">Encrypt or decrypt another file</button>
+        <div class="done-actions">
+          <button type="button" class="btn btn-ghost" id="downloadAgain" hidden>Download again</button>
+          <button type="button" class="btn btn-ghost" id="againBtn">Encrypt or decrypt another file</button>
+        </div>
       </div>
 
       <div class="visually-hidden" id="live" role="status" aria-live="polite"></div>
@@ -213,7 +207,7 @@
 
   <footer class="footer">
     <p class="footer-about">
-      <a href="https://github.com/polius/vault/blob/main/LICENSE" rel="noopener" target="_blank">Open source, MIT License</a>
+      <a href="https://github.com/polius/vault/blob/main/LICENSE" rel="noopener" target="_blank">Open source, MIT</a>
       <span aria-hidden="true">·</span>
       <a href="https://github.com/polius/vault/releases" rel="noopener" target="_blank" id="version">v2.0.3</a>
     </p>

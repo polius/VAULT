@@ -2,7 +2,15 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { generatePassphrase, passphraseBits } from '../src/js/passphrase.js';
-import { describeCrackTime, estimate, loadDictionaries, WEAK_BELOW_BITS } from '../src/js/strength.js';
+import {
+  attackerSentence,
+  describeCrackTime,
+  estimate,
+  loadDictionaries,
+  meterPhrase,
+  rate,
+  WEAK_BELOW_BITS,
+} from '../src/js/strength.js';
 import { WORDS } from '../src/js/vendor/eff-wordlist.js';
 
 const dicts = await loadDictionaries();
@@ -66,6 +74,39 @@ describe('describeCrackTime', () => {
   }
 });
 
+// The sentences a person reads, whole, so a new template can't break them (audit W1).
+describe('meterPhrase', () => {
+  for (const [s, text] of [
+    [0.1, 'guessed instantly'],
+    [3 * 86400, 'about 3 days to guess'],
+    [5 * 365.25 * 86400, 'about 5 years to guess'],
+    [1e30, 'beyond any realistic guessing'],
+  ]) {
+    it(`${s} s -> ${text}`, () => assert.equal(meterPhrase(s), text));
+  }
+
+  it('reads as a sentence for Password1! and for a generated passphrase', async () => {
+    const weak = estimate('Password1!', dicts);
+    assert.equal(`${weak.label} · ${meterPhrase(weak.crackSeconds)}`, 'Very weak · guessed instantly');
+    // The app rates its own passphrases by the generator's entropy, not by guessing.
+    const strong = rate(passphraseBits());
+    assert.equal(
+      `${strong.label} · ${meterPhrase(strong.crackSeconds)}`,
+      'Very strong · beyond any realistic guessing',
+    );
+  });
+});
+
+describe('attackerSentence', () => {
+  for (const [s, text] of [
+    [0.1, 'A well-equipped attacker could guess it instantly.'],
+    [3 * 86400, 'A well-equipped attacker could guess it in about 3 days.'],
+    [1e30, 'No realistic attacker could guess it.'],
+  ]) {
+    it(`${s} s -> ${text}`, () => assert.equal(attackerSentence(s), text));
+  }
+});
+
 describe('generatePassphrase', () => {
   it('six EFF words joined by hyphens, about 77 bits', async () => {
     const words = new Set(WORDS.filter((w) => !w.includes('-')));
@@ -75,7 +116,9 @@ describe('generatePassphrase', () => {
     assert.equal(parts.length, 6);
     for (const w of parts) assert.ok(words.has(w), w);
     assert.ok(Math.abs(passphraseBits() - 77.5) < 0.1);
-    assert.ok(estimate(phrase, dicts).bits >= 75);
+    // Some EFF words are also common passwords, so a dictionary attack model can
+    // rate a phrase as low as about 60 bits (measured over 100,000). Never weak.
+    assert.ok(!estimate(phrase, dicts).weak);
   });
 
   it('does not repeat itself', async () => {

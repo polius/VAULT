@@ -32,10 +32,10 @@ for (const sink of ['sw', 'fs', 'blob']) {
 
       const enc = await capture(page, sink, fsCap, () => encrypt(page, STRONG), work, 'a.vault');
       expect(savedName(enc)).toBe('Quarterly report ü.pdf.vault');
-      await expect(page.locator('#doneTitle')).toHaveText('Encrypted');
-      await expect(page.locator('#doneName')).toHaveText('Quarterly report ü.pdf.vault');
+      await expect(page.locator('#stateTitle')).toHaveText('Encrypted');
+      await expect(page.locator('#selName')).toHaveText('Quarterly report ü.pdf.vault');
       await expect(page.locator('#doneMeta')).toContainText(
-        sink === 'fs' ? 'Saved where you chose' : 'Saved to your downloads',
+        sink === 'fs' ? 'Saved where you chose' : 'Sent to your browser’s downloads',
       );
       // The cleartext header must not leak the name (audit M1).
       expect(enc.bytes.subarray(0, 400).includes('Quarterly')).toBe(false);
@@ -44,11 +44,13 @@ for (const sink of ['sw', 'fs', 'blob']) {
       await writeFile(vaultPath, enc.bytes);
       await page.click('#againBtn');
       await pick(page, vaultPath);
-      await expect(page.locator('#vaultInfo')).toContainText('format 3');
+      await expect(page.locator('#vaultInfo')).toHaveText(
+        'A VAULT file. Enter its password to open it. Its original name and size stay hidden until then.',
+      );
       const dec = await capture(page, sink, fsCap, () => decrypt(page, STRONG), work, 'b.out');
       expect(savedName(dec)).toBe('Quarterly report ü.pdf');
       expect(sha256(dec.bytes)).toBe(src.hash);
-      await expect(page.locator('#doneTitle')).toHaveText('Decrypted');
+      await expect(page.locator('#stateTitle')).toHaveText('Decrypted');
       await expect(page.locator('#decPwd')).toHaveValue('');
       await expectNoOpfsLeftovers(page);
       expect(problems).toEqual([]);
@@ -83,7 +85,7 @@ test('a folder becomes one ZIP and comes back intact', async ({ page, work, prob
   await page.setInputFiles('#pickFolder', root);
   await expect(page.locator('#selName')).toHaveText('Holiday photos');
   await expect(page.locator('#selMeta')).toContainText('2 files');
-  await expect(page.locator('#modeDec')).toBeDisabled();
+  await expect(page.locator('#switchMode')).toBeHidden();
   await expect(page.locator('#encGo')).toHaveText('Encrypt 2 files');
 
   const enc = await capture(page, 'sw', null, () => encrypt(page, STRONG), work, 'f.vault');

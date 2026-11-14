@@ -114,7 +114,12 @@ export function estimate(password, d = dicts) {
   if (!password) return null;
   const options = [bruteBits(password)];
   if (d) options.push(dictionaryBits(password, d), passphraseBits(password, d));
-  const bits = Math.max(0, Math.min(...options));
+  return rate(Math.max(0, Math.min(...options)));
+}
+
+// The rating for a known entropy, such as a passphrase VAULT generated itself:
+// its words are uniformly random, whatever a dictionary attack would think of them.
+export function rate(bits) {
   const score = bits < 28 ? 0 : bits < 36 ? 1 : bits < WEAK_BELOW_BITS ? 2 : bits < 64 ? 3 : 4;
   return {
     bits,
@@ -147,4 +152,23 @@ export function describeCrackTime(seconds) {
   if (years < 1e9) return `about ${Math.round(years / 1e6)} million years`;
   if (years < 1.38e10) return `about ${Math.round(years / 1e9)} billion years`;
   return 'longer than the age of the universe';
+}
+
+// Whole phrases for the two places that show a crack time, so no caller has to
+// glue describeCrackTime() into a template that only fits some of its values.
+
+// The meter, after the label: "Fair · about 3 days to guess".
+export function meterPhrase(seconds) {
+  const t = describeCrackTime(seconds);
+  if (t === 'instantly') return 'guessed instantly';
+  if (t === 'longer than the age of the universe') return 'beyond any realistic guessing';
+  return `${t} to guess`;
+}
+
+// The weak-password warning: "A well-equipped attacker could guess it in about 3 days."
+export function attackerSentence(seconds) {
+  const t = describeCrackTime(seconds);
+  if (t === 'instantly') return 'A well-equipped attacker could guess it instantly.';
+  if (t === 'longer than the age of the universe') return 'No realistic attacker could guess it.';
+  return `A well-equipped attacker could guess it in ${t}.`;
 }

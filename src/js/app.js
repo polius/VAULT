@@ -1,5 +1,6 @@
-// VAULT UI. One panel moves through four views: pick -> job -> work -> done.
-// All crypto lives in format.js; this file only wires it to the page.
+// VAULT UI. One object, the file bar, carries the selection, the progress and
+// the result; under it the page moves through four views: pick -> job -> work
+// -> done. All crypto lives in format.js; this file only wires it to the page.
 
 import {
   archiveName,
@@ -12,72 +13,85 @@ import {
   safeFileName,
 } from './files.js';
 import { E, encrypt, encryptedSize, fileSource, inspect, unlock } from './format.js';
-import { generatePassphrase } from './passphrase.js';
+import { generatePassphrase, passphraseBits } from './passphrase.js';
 import { openSink, preferredMode, registerServiceWorker, sweepLegacyStaging } from './sink.js';
-import { describeCrackTime, estimate, loadDictionaries } from './strength.js';
+import { attackerSentence, estimate, loadDictionaries, meterPhrase, rate } from './strength.js';
 import { planZip, zipStream } from './zip.js';
 
 // Above this, the in-memory fallback sink asks before continuing.
 const MEMORY_WARN_BYTES = 512 * 1024 * 1024;
 const MAX_LISTED_FILES = 500;
+// Several selected files are checked for being VAULT files only up to this many.
+const MAX_VAULT_BATCH = 50;
+const BASE_TITLE = document.title;
 
 const $ = (id) => document.getElementById(id);
 const ui = Object.fromEntries(
   [
+    'main',
     'app',
     'insecure',
     'how',
     'pick',
     'pickError',
-    'dropzone',
     'pickFiles',
     'pickFolder',
     'pickFilesBtn',
     'pickFolderBtn',
     'dropOverlay',
-    'job',
-    'modeEnc',
-    'modeDec',
+    'dropText',
+    'stateTitle',
+    'bar',
     'selIcon',
     'selName',
     'selMeta',
+    'fillIcon',
+    'fillName',
+    'fillMeta',
+    'progress',
+    'progressFill',
     'clearBtn',
+    'job',
     'fileList',
+    'fileListSummary',
     'fileListItems',
     'vaultInfo',
     'encForm',
     'encPwd',
+    'encCaps',
+    'genLink',
     'genBtn',
     'encShow',
     'meter',
     'strengthText',
     'generated',
+    'genPhrase',
     'copyBtn',
     'confirmField',
     'encPwd2',
     'confirmHelp',
     'hideName',
+    'hideNameExample',
     'encGo',
+    'saveAs',
     'decForm',
     'decPwd',
+    'decCaps',
     'decShow',
     'decGo',
     'message',
     'messageText',
     'messageAction',
+    'switchMode',
     'work',
     'workPhase',
     'workPct',
-    'progress',
-    'progressFill',
     'workStats',
     'cancelBtn',
     'done',
-    'doneTitle',
-    'doneIcon',
-    'doneName',
     'doneMeta',
     'doneDetail',
+    'downloadAgain',
     'againBtn',
     'live',
   ].map((id) => [id, $(id)]),
@@ -86,14 +100,19 @@ const ui = Object.fromEntries(
 const state = {
   view: 'pick',
   selection: null, // { files: [{ file, path }], dirs: [path] }
-  info: null, // inspect() result when the selection is one .vault file
+  info: null, // inspect() result for the .vault file being decrypted
   infoError: null, // why the selection can't be decrypted
-  mode: 'encrypt',
+  auto: 'encrypt', // what the selection implies
+  mode: 'encrypt', // what the person is doing: 'encrypt' | 'decrypt'
+  queue: [], // [{ file, info }]: .vault files still to decrypt, in order
+  decrypted: [], // what this run has decrypted so far
   generated: null, // the generated passphrase, while unchanged
-  proceed: null, // 'weak' | 'memory': the next click on the same action continues anyway
+  saved: false, // the generated passphrase was copied out of the page
+  proceed: null, // 'unsaved' | 'weak' | 'memory': the next click on the same action continues anyway
   session: null, // unlocked decrypt session waiting for a save location
   controller: null,
   sink: null,
+  results: [], // in-memory results that can be downloaded again
   resume: null,
   dicts: null,
 };
@@ -109,30 +128,45 @@ function announce(text) {
 
 function show(view) {
   state.view = view;
+  ui.main.dataset.view = view;
   for (const v of ['pick', 'job', 'work', 'done']) ui[v].hidden = v !== view;
+  ui.progress.hidden = view !== 'work';
+  if (view !== 'work') {
+    delete ui.bar.dataset.kdf;
+    document.title = BASE_TITLE;
+  }
 }
 
 function setIcon(svg, id) {
   svg.querySelector('use').setAttribute('href', `#${id}`);
 }
 
-function setMessage(kind, text, action) {
+// action: { label, run, primary }. after: the element to sit under; by default
+// the message sits right above the active form's main button.
+function setMessage(kind, text, action, after) {
   if (!kind) {
     ui.message.hidden = true;
     state.resume = null;
     return;
   }
-  // Sit right above the active form's main button, where the eye already is.
   const form = state.mode === 'decrypt' ? ui.decForm : ui.encForm;
-  form.insertBefore(ui.message, form.querySelector('[type="submit"]'));
+  if (after) after.after(ui.message);
+  else form.insertBefore(ui.message, form.querySelector('.actions'));
   ui.message.className = `notice notice-${kind}`;
   ui.message.setAttribute('role', kind === 'error' ? 'alert' : 'status');
   setIcon(ui.message.querySelector('svg'), kind === 'info' ? 'i-info' : 'i-alert');
   ui.messageText.textContent = text;
   ui.messageAction.hidden = !action;
+  ui.messageAction.className = action?.primary ? 'btn btn-ink' : 'btn btn-small';
   state.resume = action?.run ?? null;
   if (action) ui.messageAction.textContent = action.label;
   ui.message.hidden = false;
+}
+
+// While the weak-password gate shows, the risky choice is the quiet button (audit F5).
+function setGoQuiet(quiet) {
+  ui.encGo.classList.toggle('btn-lock', !quiet);
+  ui.encGo.classList.toggle('btn-ghost', quiet);
 }
 
 function setButtonLabel(btn, text) {
@@ -144,6 +178,55 @@ function encryptLabel() {
   return n > 1 ? `Encrypt ${n} files` : 'Encrypt';
 }
 
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const sizeOf = (files) => files.reduce((n, f) => n + f.file.size, 0);
+
+// ---------- the bar ----------
+
+// A long name loses its middle, never its extension: the tail never shrinks.
+// Names with right-to-left text stay whole and shorten at the end instead.
+function nameNodes(name) {
+  const head = document.createElement('span');
+  head.className = 'head';
+  if (name.length <= 16 || /[֐-ࣿיִ-﷿ﹰ-ﻼ]/.test(name)) {
+    head.textContent = name;
+    return [head];
+  }
+  const dot = name.lastIndexOf('.');
+  const ext = dot > 0 ? name.length - dot : 0;
+  const keep = Math.min(Math.floor(name.length / 2), Math.max(10, ext + 4));
+  const tail = document.createElement('span');
+  tail.className = 'tail';
+  head.textContent = name.slice(0, -keep);
+  tail.textContent = name.slice(-keep);
+  return [head, tail];
+}
+
+function setFill(pct) {
+  ui.bar.style.setProperty('--fill', String(pct));
+}
+
+// state: empty | open | sealing | sealed | opening | opened
+function setBar({ state: s, name = '', meta = '', glyph = 'i-file', fill = 0 }) {
+  ui.bar.dataset.state = s;
+  for (const [n, m, g] of [
+    [ui.selName, ui.selMeta, ui.selIcon],
+    [ui.fillName, ui.fillMeta, ui.fillIcon],
+  ]) {
+    n.replaceChildren(...nameNodes(name));
+    m.textContent = meta;
+    setIcon(g, glyph);
+  }
+  ui.selName.title = name;
+  setFill(fill);
+}
+
+// The word above the bar names the state, so it never rests on colour alone.
+function setTitle(text) {
+  ui.stateTitle.textContent = text;
+  ui.stateTitle.hidden = !text;
+}
+
 // ---------- errors ----------
 
 function explain(err, context) {
@@ -151,7 +234,7 @@ function explain(err, context) {
   const legacy = state.info && state.info.version < 3;
   switch (err?.code) {
     case E.NOT_VAULT:
-      return { kind: 'error', text: "This isn't a VAULT file. Choose Encrypt to protect it, or pick a .vault file." };
+      return { kind: 'error', text: "This isn't a VAULT file." };
     case E.UNSUPPORTED:
       return { kind: 'error', text: 'This file was made by a newer version of VAULT. Update VAULT to open it.' };
     case E.BAD_HEADER:
@@ -196,21 +279,31 @@ function explain(err, context) {
 
 // ---------- progress ----------
 
-function makeProgress(verb) {
+// drain: decrypting empties a filled bar; encrypting fills an empty one.
+function makeProgress(verb, name, { drain = false } = {}) {
   let started = 0;
   let painted = 0;
+  let slowNote = 0;
   const phase = (p) => {
     const kdf = p === 'kdf';
-    ui.progress.classList.toggle('indeterminate', kdf);
+    clearTimeout(slowNote);
     if (kdf) {
+      ui.bar.dataset.kdf = '';
+      setFill(drain ? 100 : 4);
       ui.workPhase.textContent =
         verb === 'Encrypting' ? 'Deriving a key from your password…' : 'Checking the password…';
       ui.workPct.textContent = '';
-      ui.workStats.textContent = 'This takes a moment on purpose: it makes guessing passwords slow.';
+      ui.workStats.textContent = '';
       ui.progress.removeAttribute('aria-valuenow');
       ui.progress.removeAttribute('aria-valuetext');
-      ui.progressFill.style.width = '';
+      document.title = `${verb} ${name} · VAULT`;
+      // Only worth reading if the phase lasts long enough to read it.
+      slowNote = setTimeout(() => {
+        if (state.view === 'work' && 'kdf' in ui.bar.dataset)
+          ui.workStats.textContent = 'This takes a moment on purpose: it makes guessing passwords slow.';
+      }, 500);
     } else {
+      delete ui.bar.dataset.kdf;
       started = performance.now();
       ui.workPhase.textContent = `${verb}…`;
       ui.workStats.textContent = '';
@@ -223,10 +316,12 @@ function makeProgress(verb) {
     painted = now;
     const pct = total ? Math.min(100, (done / total) * 100) : 100;
     const rounded = Math.floor(pct);
-    ui.progressFill.style.width = `${pct}%`;
+    setFill(drain ? 100 - pct : pct);
     ui.progress.setAttribute('aria-valuenow', String(rounded));
     ui.progress.setAttribute('aria-valuetext', `${rounded}%`);
     ui.workPct.textContent = `${rounded}%`;
+    // The tab says how far it got, for people who switch away (audit F8).
+    document.title = `${rounded}% · ${verb} ${name}`;
     const secs = (now - started) / 1000;
     if (secs > 0.5 && done > 0 && done < total) {
       const rate = done / secs;
@@ -240,35 +335,84 @@ function makeProgress(verb) {
 
 // ---------- selection ----------
 
-function renderSelection() {
+function outName() {
   const { files, dirs } = state.selection;
-  const total = files.reduce((n, f) => n + f.file.size, 0);
+  if (ui.hideName.checked) return ui.hideNameExample.textContent;
   const single = files.length === 1 && !dirs.length;
-  ui.selName.textContent = single ? files[0].file.name : archiveName(state.selection).replace(/\.zip$/, '');
-  ui.selName.title = ui.selName.textContent;
-  const parts = single
-    ? [formatBytes(total)]
-    : [`${files.length} file${files.length === 1 ? '' : 's'}`, formatBytes(total), 'packed into one ZIP'];
-  if (dirs.length) parts.splice(1, 0, `${dirs.length} empty folder${dirs.length === 1 ? '' : 's'}`);
-  ui.selMeta.textContent = parts.join(' · ');
-  setIcon(ui.selIcon, single ? (state.info ? 'i-vault' : 'i-file') : 'i-files');
+  return `${safeFileName(single ? files[0].file.name : archiveName(state.selection))}.vault`;
+}
 
+function renderBar() {
+  const { files, dirs } = state.selection;
+  if (state.mode === 'decrypt') {
+    const many = state.queue.length > 1;
+    setBar({
+      state: 'sealed',
+      name: many ? `${state.queue.length} VAULT files` : files[0].file.name,
+      meta: formatBytes(sizeOf(files)),
+      glyph: 'i-lock',
+      fill: 100,
+    });
+    return;
+  }
+  const single = files.length === 1 && !dirs.length;
+  const parts = [formatBytes(sizeOf(files))];
+  if (!single) parts.unshift(plural(files.length, 'file'));
+  setBar({
+    state: 'open',
+    name: single ? files[0].file.name : archiveName(state.selection).replace(/\.zip$/, ''),
+    meta: parts.join(' · '),
+    glyph: single ? 'i-file' : 'i-files',
+  });
+}
+
+function renderFileList() {
+  const { files, dirs } = state.selection;
+  const single = files.length === 1 && !dirs.length;
   ui.fileList.hidden = single;
-  ui.fileList.open = false;
+  // Short lists are open from the start; each row can be removed (audit F6).
+  ui.fileList.open = !single && files.length + dirs.length <= 8;
+  ui.fileListSummary.textContent = ui.fileList.open ? 'Hide files' : 'Show files';
   ui.fileListItems.replaceChildren(
-    ...files.slice(0, MAX_LISTED_FILES).map((f) => {
+    ...files.slice(0, MAX_LISTED_FILES).map((f, index) => {
       const li = document.createElement('li');
       const name = document.createElement('span');
       const size = document.createElement('span');
+      const remove = document.createElement('button');
+      name.className = 'file-path';
+      size.className = 'file-size';
       name.textContent = f.path;
       size.textContent = formatBytes(f.file.size);
-      li.append(name, size);
+      remove.type = 'button';
+      remove.className = 'icon-btn';
+      remove.setAttribute('aria-label', `Remove ${f.path}`);
+      remove.title = 'Remove';
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+      svg.setAttribute('class', 'icon');
+      svg.setAttribute('aria-hidden', 'true');
+      use.setAttribute('href', '#i-x');
+      svg.append(use);
+      remove.append(svg);
+      remove.addEventListener('click', () => removeFile(index));
+      li.append(name, size, remove);
       return li;
     }),
   );
   if (files.length > MAX_LISTED_FILES) {
     const li = document.createElement('li');
     li.textContent = `and ${files.length - MAX_LISTED_FILES} more`;
+    ui.fileListItems.append(li);
+  }
+  for (const dir of dirs.slice(0, MAX_LISTED_FILES)) {
+    const li = document.createElement('li');
+    const name = document.createElement('span');
+    const kind = document.createElement('span');
+    name.className = 'file-path';
+    kind.className = 'file-size';
+    name.textContent = `${dir}/`;
+    kind.textContent = 'empty folder';
+    li.append(name, kind);
     ui.fileListItems.append(li);
   }
 }
@@ -282,10 +426,17 @@ function renderVaultInfo() {
     el.className = 'vault-info help error';
     return;
   }
-  const { version, legacy, kdf } = state.info;
   el.className = 'vault-info';
+  if (state.queue.length > 1) {
+    const legacy = state.queue.some((q) => q.info.version < 3);
+    el.textContent =
+      `${state.queue.length} VAULT files. Enter their password to open them one after another; each one is saved on its own.` +
+      (legacy ? ' Some were made with VAULT 1.x; encrypt them again afterwards to upgrade them.' : '');
+    return;
+  }
+  const { version, legacy } = state.info;
   if (version === 3) {
-    el.textContent = `Encrypted with VAULT · format 3 · ${kdf}. The original name and size stay hidden until you unlock it.`;
+    el.textContent = 'A VAULT file. Enter its password to open it. Its original name and size stay hidden until then.';
   } else {
     el.textContent =
       `Encrypted with VAULT 1.x (format ${version}) · original name ${legacy.name} · ${formatBytes(legacy.size)}. ` +
@@ -295,64 +446,165 @@ function renderVaultInfo() {
   }
 }
 
+// The app knows which mode applies; a quiet link covers the rare other case (audit F4).
+function renderSwitch() {
+  const many = state.selection.files.length > 1;
+  ui.switchMode.hidden = state.auto !== 'decrypt';
+  ui.switchMode.textContent =
+    state.mode === 'decrypt'
+      ? many
+        ? 'Encrypt these files into one instead'
+        : 'Encrypt this file again instead'
+      : many
+        ? 'Decrypt them instead'
+        : 'Decrypt it instead';
+}
+
+// Also names each file to password managers, which otherwise see every file as
+// the same account and offer to overwrite one with the next (audit F13).
+function renderSaveAs() {
+  const out = outName();
+  ui.saveAs.textContent = `saves ${out}`;
+  ui.encForm.elements.username.value = out;
+  ui.decForm.elements.username.value = state.queue[0]?.file.name ?? 'VAULT file';
+}
+
+function renderJob() {
+  const many = state.queue.length > 1;
+  setTitle(state.mode === 'decrypt' ? (many ? `Decrypt ${state.queue.length} files` : 'Decrypt') : 'Encrypt');
+  renderBar();
+  ui.decGo.disabled = Boolean(state.infoError);
+  setButtonLabel(ui.encGo, encryptLabel());
+  setButtonLabel(ui.decGo, many ? `Decrypt ${state.queue.length} files` : 'Decrypt');
+  renderVaultInfo();
+  renderSwitch();
+  renderSaveAs();
+}
+
 function setMode(mode) {
   state.mode = mode;
   state.proceed = null;
   state.session = null;
   ui.app.dataset.mode = mode;
-  ui.modeEnc.checked = mode === 'encrypt';
-  ui.modeDec.checked = mode === 'decrypt';
-  const single = state.selection.files.length === 1 && !state.selection.dirs.length;
-  ui.modeDec.disabled = !single;
-  ui.modeDec.closest('label').title = single ? '' : 'Decrypt works on one .vault file at a time';
   ui.encForm.hidden = mode !== 'encrypt';
   ui.decForm.hidden = mode !== 'decrypt';
-  ui.decGo.disabled = Boolean(state.infoError);
-  setButtonLabel(ui.encGo, encryptLabel());
-  renderVaultInfo();
+  setGoQuiet(false);
+  ui.hideNameExample.textContent = neutralName();
+  renderJob();
   setMessage(null);
 }
 
-async function select(selection) {
+function releaseResults() {
+  for (const r of state.results) r.release();
+  state.results = [];
+}
+
+// Looks inside each file: a .vault file is recognised by its bytes, whatever its name.
+async function classify() {
+  const { files, dirs } = state.selection;
+  state.info = null;
+  state.infoError = null;
+  state.queue = [];
+  if (dirs.length || !files.length) return 'encrypt';
+  if (files.length === 1) {
+    try {
+      state.info = await inspect(files[0].file);
+      state.queue = [{ file: files[0].file, info: state.info }];
+      return 'decrypt';
+    } catch (err) {
+      if (err?.name !== 'VaultError') throw err;
+      if (err.code === E.NOT_VAULT) return 'encrypt';
+      state.infoError = err;
+      state.queue = [{ file: files[0].file, info: null }];
+      return 'decrypt';
+    }
+  }
+  if (files.length > MAX_VAULT_BATCH) return 'encrypt';
+  const infos = await Promise.all(files.map((f) => inspect(f.file).catch(() => null)));
+  if (!infos.every(Boolean)) return 'encrypt';
+  state.queue = files.map((f, i) => ({ file: f.file, info: infos[i] }));
+  state.info = infos[0];
+  return 'decrypt';
+}
+
+// Ordinary files dropped or pasted onto ordinary files join them; anything
+// involving .vault files starts again (audit F6).
+const mergeable = () => state.view === 'job' && state.auto === 'encrypt' && state.mode === 'encrypt';
+
+async function allVaults(selection) {
+  const { files, dirs } = selection;
+  if (dirs.length || !files.length || files.length > MAX_VAULT_BATCH) return false;
+  const infos = await Promise.all(files.map((f) => inspect(f.file).then(Boolean, () => false)));
+  return infos.every(Boolean);
+}
+
+async function add(incoming) {
+  if (!mergeable() || !(incoming.files.length || incoming.dirs.length)) return select(incoming);
+  if (await allVaults(incoming)) {
+    await select(incoming);
+    if (state.mode === 'decrypt') {
+      const text = 'Started again with what you dropped: .vault files are decrypted on their own.';
+      setMessage('info', text);
+      announce(text);
+    }
+    return;
+  }
+  // The same file dropped twice is listed once.
+  const key = (f) => `${f.path}\u0000${f.file.size}\u0000${f.file.lastModified}`;
+  const have = new Set(state.selection.files.map(key));
+  const files = [...state.selection.files, ...incoming.files.filter((f) => !have.has(key(f)))];
+  const dirs = [...new Set([...state.selection.dirs, ...incoming.dirs])];
+  const before = state.selection.files.length;
+  await select({ files, dirs }, { keepFocus: true });
+  announce(`Added ${plural(files.length - before, 'file')}. ${plural(files.length, 'file')} selected.`);
+}
+
+function removeFile(index) {
+  const files = state.selection.files.filter((_, i) => i !== index);
+  if (!files.length && !state.selection.dirs.length) return reset();
+  return select({ files, dirs: state.selection.dirs }, { keepFocus: true }).then(() => {
+    // Keep the keyboard where it was: the next row's button, or the list.
+    const buttons = ui.fileListItems.querySelectorAll('button');
+    (buttons[Math.min(index, buttons.length - 1)] ?? (ui.fileList.hidden ? ui.encPwd : ui.fileListSummary)).focus();
+  });
+}
+
+async function select(selection, { keepFocus = false } = {}) {
   if (state.view === 'work') {
     announce('Wait for the current file to finish, or cancel it first.');
     return;
   }
   ui.pickError.hidden = true;
   if (!selection.files.length && !selection.dirs.length) {
+    if (state.view !== 'pick') reset();
     ui.pickError.textContent = 'That folder is empty. There is nothing to encrypt.';
     ui.pickError.hidden = false;
     return;
   }
+  releaseResults();
   state.selection = dedupePaths(selection);
-  state.info = null;
-  state.infoError = null;
-  let mode = 'encrypt';
-  const { files, dirs } = state.selection;
-  if (files.length === 1 && !dirs.length) {
-    try {
-      state.info = await inspect(files[0].file);
-      mode = 'decrypt';
-    } catch (err) {
-      if (err?.name !== 'VaultError') {
-        ui.pickError.textContent = `Couldn’t read “${files[0].file.name}”. To add a folder, drop it or use Choose a folder.`;
-        ui.pickError.hidden = false;
-        state.selection = null;
-        return;
-      }
-      state.infoError = err;
-      if (err.code !== E.NOT_VAULT) mode = 'decrypt';
-    }
+  state.decrypted = [];
+  try {
+    state.auto = await classify();
+  } catch {
+    const name = state.selection.files[0].file.name;
+    if (state.view !== 'pick') reset();
+    ui.pickError.textContent = `Couldn’t read “${name}”. To add a folder, drop it or use Choose a folder.`;
+    ui.pickError.hidden = false;
+    state.selection = null;
+    return;
   }
-  renderSelection();
-  setMode(mode);
+  renderFileList();
+  setMode(state.auto);
   show('job');
+  if (keepFocus) return;
+  const name = ui.selName.textContent;
   announce(
-    mode === 'decrypt'
-      ? `${files[0].file.name} selected. Enter the password to decrypt it.`
-      : `${ui.selName.textContent} selected. Choose a password to encrypt it.`,
+    state.mode === 'decrypt'
+      ? `${name} selected. Enter the password to decrypt ${state.queue.length > 1 ? 'them' : 'it'}.`
+      : `${name} selected. Choose a password to encrypt it.`,
   );
-  (mode === 'decrypt' ? ui.decPwd : ui.encPwd).focus();
+  (state.mode === 'decrypt' ? ui.decPwd : ui.encPwd).focus();
 }
 
 function clearSecrets() {
@@ -360,6 +612,7 @@ function clearSecrets() {
   ui.encPwd2.value = '';
   ui.decPwd.value = '';
   state.generated = null;
+  state.saved = false;
   state.session = null;
   setShown(ui.encShow, [ui.encPwd, ui.encPwd2], false);
   setShown(ui.decShow, [ui.decPwd], false);
@@ -368,13 +621,18 @@ function clearSecrets() {
 
 function reset() {
   clearSecrets();
+  releaseResults();
   state.selection = null;
   state.info = null;
   state.infoError = null;
+  state.queue = [];
+  state.decrypted = [];
   state.proceed = null;
   ui.hideName.checked = false;
   ui.pickError.hidden = true;
   setMessage(null);
+  setBar({ state: 'empty' });
+  setTitle('');
   show('pick');
   ui.pickFilesBtn.focus();
 }
@@ -391,13 +649,18 @@ function setShown(btn, inputs, shown) {
 
 function updateStrength() {
   const pw = ui.encPwd.value;
-  const e = estimate(pw, state.dicts);
-  ui.meter.hidden = !e;
-  if (!e) return;
+  // A passphrase VAULT generated is rated by the generator's entropy.
+  const e = pw && pw === state.generated ? rate(passphraseBits()) : estimate(pw, state.dicts);
+  if (!e) {
+    ui.meter.dataset.empty = '';
+    ui.strengthText.textContent = '';
+    return;
+  }
+  delete ui.meter.dataset.empty;
   ui.meter.dataset.score = String(e.score);
   const label = document.createElement('b');
   label.textContent = e.label;
-  ui.strengthText.replaceChildren(label, ` · ${describeCrackTime(e.crackSeconds)} to guess`);
+  ui.strengthText.replaceChildren(label, ` · ${meterPhrase(e.crackSeconds)}`);
 }
 
 function updateConfirm(final = false) {
@@ -407,29 +670,34 @@ function updateConfirm(final = false) {
   ui.encPwd2.setAttribute('aria-invalid', String(Boolean(mismatch) || (final && !confirm)));
   if (mismatch) {
     ui.confirmHelp.textContent = 'The passwords don’t match.';
-    ui.confirmHelp.className = 'help error';
+    ui.confirmHelp.className = 'help reserve error';
   } else if (confirm && confirm === pw) {
     ui.confirmHelp.textContent = 'The passwords match.';
-    ui.confirmHelp.className = 'help ok';
+    ui.confirmHelp.className = 'help reserve ok';
   } else if (final && !confirm) {
     ui.confirmHelp.textContent = 'Type the password again to confirm it.';
-    ui.confirmHelp.className = 'help error';
+    ui.confirmHelp.className = 'help reserve error';
   } else {
     ui.confirmHelp.textContent = '';
-    ui.confirmHelp.className = 'help';
+    ui.confirmHelp.className = 'help reserve';
   }
 }
 
 function updateEncryptFields() {
-  if (state.generated && ui.encPwd.value !== state.generated) state.generated = null;
+  if (state.generated && ui.encPwd.value !== state.generated) {
+    state.generated = null;
+    state.saved = false;
+  }
   ui.generated.hidden = !state.generated;
+  ui.genPhrase.textContent = state.generated ?? '';
   ui.confirmField.hidden = Boolean(state.generated);
   ui.encPwd.removeAttribute('aria-invalid');
-  if (state.proceed === 'weak') {
+  if (state.proceed === 'weak' || state.proceed === 'unsaved') {
     state.proceed = null;
     setMessage(null);
     setButtonLabel(ui.encGo, encryptLabel());
   }
+  setGoQuiet(false);
   updateStrength();
   updateConfirm();
 }
@@ -445,46 +713,112 @@ async function ensureDictionaries() {
   return state.dicts;
 }
 
+const isMac = /Mac|iPhone|iPad/.test(navigator.userAgentData?.platform ?? navigator.platform ?? '');
+
+async function copyPassphrase() {
+  const label = ui.copyBtn.querySelector('span');
+  try {
+    await navigator.clipboard.writeText(ui.encPwd.value);
+    state.saved = true;
+    label.textContent = 'Copied';
+    announce('Passphrase copied to the clipboard.');
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents(ui.genPhrase);
+    getSelection().removeAllRanges();
+    getSelection().addRange(range);
+    label.textContent = isMac ? 'Press ⌘C' : 'Press Ctrl+C';
+  }
+  setTimeout(() => {
+    label.textContent = 'Copy';
+  }, 2500);
+}
+
+async function generatePhrase() {
+  const phrase = await generatePassphrase();
+  ui.encPwd.value = phrase;
+  ui.encPwd2.value = '';
+  state.generated = phrase;
+  state.saved = false;
+  // Shown once, whole, in the block below; the field keeps it masked.
+  setShown(ui.encShow, [ui.encPwd, ui.encPwd2], false);
+  updateEncryptFields();
+  ui.encPwd.focus();
+  announce('Passphrase generated and shown below the password field. Store it before you continue.');
+}
+
 // ---------- running a job ----------
 
 function begin(mode) {
   ui.app.dataset.mode = mode;
   setMessage(null);
-  ui.progressFill.style.width = '0';
   ui.workPct.textContent = '';
   ui.workStats.textContent = '';
   ui.workPhase.textContent = 'Starting…';
   ui.cancelBtn.disabled = false;
   state.controller = new AbortController();
+  setTitle(mode === 'encrypt' ? 'Encrypting' : 'Decrypting');
   show('work');
   ui.cancelBtn.focus();
+}
+
+// Back to the form, with the bar showing the selection again.
+function backToJob() {
+  show('job');
+  renderJob();
+}
+
+// After a multi-file decrypt stops part-way, only the files still to do stay selected.
+function keepRemaining() {
+  const left = new Set(state.queue.map((q) => q.file));
+  state.selection = {
+    files: state.selection.files.filter((f) => left.has(f.file)),
+    dirs: [],
+  };
+  state.info = state.queue[0]?.info ?? null;
+  state.decrypted = [];
+  releaseResults();
+  renderFileList();
 }
 
 function fail(err, context) {
   if (err?.name !== 'VaultError' && err?.name !== 'AbortError') console.error(err);
   state.sink = null;
-  const { kind, text } = explain(err, context);
-  show('job');
+  let { kind, text } = explain(err, context);
+  const done = state.decrypted.length;
+  if (state.mode === 'decrypt' && done) {
+    const total = done + state.queue.length;
+    const next = state.queue[0]?.file.name;
+    text =
+      err?.code === E.WRONG_PASSWORD
+        ? `${done} of ${total} files decrypted and saved. “${next}” needs a different password.`
+        : `${done} of ${total} files decrypted and saved. ${text}`;
+    keepRemaining();
+  }
+  backToJob();
   setMessage(kind, text);
   announce(text);
   if (err?.code === E.WRONG_PASSWORD) {
-    ui.decPwd.value = '';
+    // Keep it: the person is still here, and needs it to find the typo (audit F10).
     ui.decPwd.focus();
+    ui.decPwd.select();
   } else if (state.mode === 'encrypt') ui.encGo.focus();
   else ui.decGo.focus();
 }
 
+// A download is handed to the browser; VAULT can't know what it did with it (audit F9).
+const savedWhere = (mode) => (mode === 'fs' ? 'Saved where you chose' : 'Sent to your browser’s downloads');
+
 // notes: short sentences, one line each on a laptop.
-function finish({ title, icon, size, notes = [] }) {
-  const { name } = state.sink;
-  const meta = `${formatBytes(size)} · ${state.sink.mode === 'fs' ? 'Saved where you chose' : 'Saved to your downloads'}`;
+function finish({ title, bar, size, where, notes = [] }) {
   state.sink = null;
   state.controller = null;
   clearSecrets();
-  ui.doneTitle.textContent = title;
-  setIcon(ui.doneIcon, icon);
-  ui.doneName.textContent = name;
-  ui.doneMeta.textContent = meta;
+  setTitle(title);
+  setBar(bar);
+  ui.doneMeta.textContent = where;
+  ui.downloadAgain.hidden = !state.results.length;
+  ui.downloadAgain.textContent = state.results.length > 1 ? 'Download them again' : 'Download again';
   ui.doneDetail.replaceChildren(
     ...notes.map((text) => {
       const p = document.createElement('p');
@@ -493,8 +827,8 @@ function finish({ title, icon, size, notes = [] }) {
     }),
   );
   show('done');
-  ui.doneTitle.focus();
-  announce(`${title}: ${name}. ${meta}. ${notes.join(' ')}`);
+  ui.stateTitle.focus();
+  announce(`${title}: ${bar.name}, ${formatBytes(size)}. ${where}. ${notes.join(' ')}`);
 }
 
 async function needsMemoryConfirm(bytes, run) {
@@ -543,14 +877,31 @@ async function startEncrypt() {
     announce(ui.confirmHelp.textContent);
     return;
   }
+  // A generated passphrase skips the confirmation field, so ask once whether it
+  // was stored: VAULT forgets it the moment the run ends (audit F1).
+  if (state.generated && !state.saved && state.proceed !== 'unsaved') {
+    state.proceed = 'unsaved';
+    setMessage(
+      'warn',
+      'Have you saved this passphrase? VAULT forgets it as soon as the file is encrypted, and nobody can recover it.',
+      { label: 'Copy passphrase', run: copyPassphrase },
+    );
+    setButtonLabel(ui.encGo, 'I saved it. Encrypt');
+    announce(ui.messageText.textContent);
+    return;
+  }
   const strength = estimate(password, await ensureDictionaries());
   if (strength.weak && state.proceed !== 'weak') {
     state.proceed = 'weak';
+    // Right under the meter it is about, with the safe choice as the big button (audit F5).
     setMessage(
       'warn',
-      `This password is ${strength.label.toLowerCase()}. A well-equipped attacker could guess it in ${describeCrackTime(strength.crackSeconds)}. Use a longer one or generate a passphrase, or encrypt anyway.`,
+      `This password is ${strength.label.toLowerCase()}. ${attackerSentence(strength.crackSeconds)} Use a longer one or generate a passphrase, or encrypt anyway.`,
+      { label: 'Use a generated passphrase', run: generatePhrase, primary: true },
+      ui.meter,
     );
     setButtonLabel(ui.encGo, 'Encrypt anyway');
+    setGoQuiet(true);
     announce(ui.messageText.textContent);
     return;
   }
@@ -562,17 +913,20 @@ async function startEncrypt() {
     setMessage('error', explain(err).text);
     return;
   }
-  const outName = ui.hideName.checked ? neutralName() : `${safeFileName(job.meta.name)}.vault`;
+  const name = outName();
   const outSize = encryptedSize({ meta: job.meta, size: job.size });
   if (await needsMemoryConfirm(outSize, startEncrypt)) return;
   state.proceed = null;
   setButtonLabel(ui.encGo, encryptLabel());
+  setGoQuiet(false);
 
   begin('encrypt');
+  const barName = ui.selName.title;
+  setBar({ state: 'sealing', name: barName, meta: ui.selMeta.textContent, glyph: 'i-lock', fill: 0 });
   const { signal } = state.controller;
-  const progress = makeProgress('Encrypting');
+  const progress = makeProgress('Encrypting', barName);
   try {
-    state.sink = await openSink({ name: outName, size: outSize });
+    state.sink = await openSink({ name, size: outSize });
     const out = encrypt({
       password,
       meta: job.meta,
@@ -588,16 +942,26 @@ async function startEncrypt() {
     }
     signal.throwIfAborted();
     await state.sink.close();
+    const { mode } = state.sink;
+    if (mode === 'blob') state.results.push(state.sink);
+    const many = job.meta.type === 'zip';
     finish({
       title: 'Encrypted',
-      icon: 'i-vault',
+      bar: { state: 'sealed', name: state.sink.name, meta: formatBytes(outSize), glyph: 'i-lock', fill: 100 },
       size: outSize,
-      notes: ['Keep your password safe. Without it, no one can open this file.'],
+      where: savedWhere(mode),
+      notes: [
+        many
+          ? 'Your original files are unchanged. Delete them yourself if you only want to keep the encrypted copy.'
+          : 'Your original file is unchanged. Delete it yourself if you only want to keep the encrypted copy.',
+        'Without the password, nobody can open it, not even you.',
+      ],
     });
   } catch (err) {
     await state.sink?.abort();
     if (err?.name === 'SecurityError' || err?.name === 'NotAllowedError') {
-      show('job');
+      state.sink = null;
+      backToJob();
       setMessage('info', 'Your browser needs one more click before it can show the save dialog.', {
         label: 'Choose where to save',
         run: startEncrypt,
@@ -615,49 +979,73 @@ async function startDecrypt() {
     ui.decPwd.focus();
     return;
   }
-  const { file } = state.selection.files[0];
+  state.decrypted = [];
   begin('decrypt');
-  const progress = makeProgress('Decrypting');
+  await unlockNext(password);
+}
+
+// Decrypts the .vault files in the queue one after another with one password.
+async function unlockNext(password) {
+  const { file, info } = state.queue[0];
+  const total = state.decrypted.length + state.queue.length;
+  state.info = info;
+  setTitle(total > 1 ? `Decrypting ${state.decrypted.length + 1} of ${total}` : 'Decrypting');
+  setBar({ state: 'sealed', name: file.name, meta: formatBytes(file.size), glyph: 'i-lock', fill: 100 });
+  const progress = makeProgress('Decrypting', file.name, { drain: true });
   try {
-    state.session = await unlock(file, password, { info: state.info, onPhase: progress.phase });
+    state.session = await unlock(file, password, { info, onPhase: progress.phase });
   } catch (err) {
     fail(err, 'unlock');
     return;
   }
-  ui.decPwd.value = '';
   await saveDecrypted(progress);
 }
 
-async function saveDecrypted(progress = makeProgress('Decrypting')) {
+async function saveDecrypted(progress) {
   const { session } = state;
   if (!session) return;
   const name = safeFileName(session.meta.name);
   if (await needsMemoryConfirm(session.meta.size, () => saveDecrypted())) {
-    show('job');
+    backToJob();
     return;
   }
   state.proceed = null;
   if (state.view !== 'work') begin('decrypt');
+  const total = state.decrypted.length + state.queue.length;
+  if (total > 1) setTitle(`Decrypting ${state.decrypted.length + 1} of ${total}`);
+  // The original name is the first thing VAULT decrypts: show it, then drain the fill.
+  setBar({ state: 'opening', name, meta: formatBytes(session.meta.size), glyph: 'i-unlock', fill: 100 });
+  const run = progress ?? makeProgress('Decrypting', name, { drain: true });
   const { signal } = state.controller;
   try {
     signal.throwIfAborted();
     state.sink = await openSink({ name, size: session.meta.size });
-    progress.phase('decrypt');
-    for await (const plain of session.chunks({ signal, onProgress: progress.update })) {
+    run.phase('decrypt');
+    for await (const plain of session.chunks({ signal, onProgress: run.update })) {
       signal.throwIfAborted();
       await state.sink.write(plain);
     }
     signal.throwIfAborted();
     await state.sink.close();
-    const zip = session.meta.type === 'zip';
-    const notes = [];
-    if (zip) notes.push(`A ZIP archive with ${session.meta.count ?? 'several'} files. Open it to extract them.`);
-    if (session.warnings.length) notes.push('Made with an older VAULT format. Encrypt it again to upgrade it.');
-    finish({ title: 'Decrypted', icon: zip ? 'i-files' : 'i-file', size: session.meta.size, notes });
+    const sink = state.sink;
+    state.sink = null;
+    if (sink.mode === 'blob') state.results.push(sink);
+    state.decrypted.push({
+      name: sink.name,
+      size: session.meta.size,
+      zip: session.meta.type === 'zip' ? (session.meta.count ?? 'several') : 0,
+      legacy: session.warnings.length > 0,
+      mode: sink.mode,
+    });
+    state.session = null;
+    state.queue.shift();
+    if (state.queue.length) await unlockNext(ui.decPwd.value);
+    else finishDecrypt();
   } catch (err) {
     await state.sink?.abort();
     if (err?.name === 'SecurityError' || err?.name === 'NotAllowedError') {
-      show('job');
+      state.sink = null;
+      backToJob();
       setMessage('info', `Password correct. Your browser needs one more click to show the save dialog for “${name}”.`, {
         label: `Save ${name}`,
         run: () => saveDecrypted(),
@@ -669,10 +1057,37 @@ async function saveDecrypted(progress = makeProgress('Decrypting')) {
   }
 }
 
+function finishDecrypt() {
+  const items = state.decrypted;
+  const size = items.reduce((n, i) => n + i.size, 0);
+  const notes = [];
+  for (const i of items)
+    if (i.zip)
+      notes.push(
+        `${items.length > 1 ? `${i.name} is a` : 'A'} ZIP archive with ${i.zip} files. Open it to extract them.`,
+      );
+  if (items.some((i) => i.legacy)) notes.push('Made with an older VAULT format. Encrypt it again to upgrade it.');
+  if (items.length > 1) notes.unshift(`Saved ${items.map((i) => i.name).join(', ')}.`);
+  const one = items.length === 1;
+  finish({
+    title: 'Decrypted',
+    bar: {
+      state: 'opened',
+      name: one ? items[0].name : plural(items.length, 'file'),
+      meta: formatBytes(size),
+      glyph: 'i-unlock',
+      fill: 0,
+    },
+    size,
+    where: savedWhere(items.at(-1).mode),
+    notes,
+  });
+}
+
 // ---------- wiring ----------
 
 function wire() {
-  // Drag and drop anywhere on the page. Files dropped outside the panel must
+  // Drag and drop anywhere on the page. Files dropped outside the bar must
   // never fall through to the browser, which would open them and leave VAULT.
   let depth = 0;
   const hasFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files');
@@ -681,6 +1096,8 @@ function wire() {
     e.preventDefault();
     depth++;
     if (state.view !== 'work') {
+      ui.dropText.textContent =
+        state.view === 'job' ? (mergeable() ? 'Drop to add' : 'Drop to replace') : 'Drop to choose';
       ui.dropOverlay.hidden = false;
       document.body.classList.add('dragging');
     }
@@ -708,29 +1125,54 @@ function wire() {
       announce('Wait for the current file to finish, or cancel it first.');
       return;
     }
-    fromDataTransfer(e.dataTransfer).then(select, (err) => {
+    fromDataTransfer(e.dataTransfer).then(add, (err) => {
+      if (state.view !== 'pick') reset();
       ui.pickError.textContent = `Couldn’t read what was dropped: ${err.message}`;
       ui.pickError.hidden = false;
     });
   });
 
-  ui.dropzone.addEventListener('click', (e) => {
-    if (!e.target.closest('button')) ui.pickFiles.click();
-  });
   ui.pickFilesBtn.addEventListener('click', () => ui.pickFiles.click());
   ui.pickFolderBtn.addEventListener('click', () => ui.pickFolder.click());
   for (const input of [ui.pickFiles, ui.pickFolder]) {
     input.addEventListener('change', () => {
       const selection = fromFileList(input.files);
       input.value = '';
-      if (selection.files.length) select(selection);
+      // An empty folder picked with the button arrives as no files at all.
+      if (selection.files.length || input === ui.pickFolder) select(selection);
     });
   }
 
+  ui.fileList.addEventListener('toggle', () => {
+    ui.fileListSummary.textContent = ui.fileList.open ? 'Hide files' : 'Show files';
+  });
+
   ui.clearBtn.addEventListener('click', reset);
   ui.againBtn.addEventListener('click', reset);
-  ui.modeEnc.addEventListener('change', () => setMode('encrypt'));
-  ui.modeDec.addEventListener('change', () => setMode('decrypt'));
+  ui.downloadAgain.addEventListener('click', () => {
+    for (const r of state.results) r.again();
+  });
+  ui.switchMode.addEventListener('click', () => {
+    setMode(state.mode === 'decrypt' ? 'encrypt' : 'decrypt');
+    (state.mode === 'decrypt' ? ui.decPwd : ui.encPwd).focus();
+  });
+  ui.hideName.addEventListener('change', renderSaveAs);
+
+  // Caps Lock, while a password field has focus (audit F10).
+  for (const [input, hint] of [
+    [ui.encPwd, ui.encCaps],
+    [ui.encPwd2, ui.encCaps],
+    [ui.decPwd, ui.decCaps],
+  ]) {
+    const check = (e) => {
+      hint.hidden = !e.getModifierState?.('CapsLock');
+    };
+    input.addEventListener('keydown', check);
+    input.addEventListener('keyup', check);
+    input.addEventListener('blur', () => {
+      hint.hidden = true;
+    });
+  }
 
   ui.encPwd.addEventListener('focus', ensureDictionaries, { once: true });
   ui.encPwd.addEventListener('input', updateEncryptFields);
@@ -753,32 +1195,16 @@ function wire() {
     if (!ui.message.hidden && state.resume === null) setMessage(null);
   });
 
-  ui.genBtn.addEventListener('click', async () => {
-    const phrase = await generatePassphrase();
-    ui.encPwd.value = phrase;
-    ui.encPwd2.value = '';
-    state.generated = phrase;
-    setShown(ui.encShow, [ui.encPwd, ui.encPwd2], true);
-    updateEncryptFields();
-    ui.encPwd.focus();
-    announce('Passphrase generated and shown in the password field. Store it before you continue.');
-  });
+  ui.genBtn.addEventListener('click', generatePhrase);
+  ui.genLink.addEventListener('click', generatePhrase);
 
-  ui.copyBtn.addEventListener('click', async () => {
-    const label = ui.copyBtn.querySelector('span');
-    try {
-      await navigator.clipboard.writeText(ui.encPwd.value);
-      label.textContent = 'Copied';
-      announce('Passphrase copied to the clipboard.');
-    } catch {
-      ui.encPwd.focus();
-      ui.encPwd.select();
-      label.textContent = 'Press Ctrl+C';
-    }
-    setTimeout(() => {
-      label.textContent = 'Copy';
-    }, 2500);
-  });
+  ui.copyBtn.addEventListener('click', copyPassphrase);
+  // Copying by hand counts as storing it too.
+  for (const el of [ui.encPwd, ui.genPhrase]) {
+    el.addEventListener('copy', () => {
+      if (state.generated) state.saved = true;
+    });
+  }
 
   ui.encForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -798,6 +1224,22 @@ function wire() {
     state.sink?.abort();
   });
 
+  // A copied file pasted anywhere is a selection; text pastes stay text (audit F12).
+  document.addEventListener('paste', (e) => {
+    const files = e.clipboardData?.files;
+    if (!files?.length) return;
+    e.preventDefault();
+    if (state.view === 'work') announce('Wait for the current file to finish, or cancel it first.');
+    else add(fromFileList(files));
+  });
+  // Escape leaves a job nobody has typed into yet; during a run it reaches
+  // Cancel without cancelling by itself.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    if (state.view === 'work') ui.cancelBtn.focus();
+    else if (state.view === 'job' && !ui.encPwd.value && !ui.encPwd2.value && !ui.decPwd.value) reset();
+  });
+
   window.addEventListener('beforeunload', (e) => {
     if (state.view === 'work') e.preventDefault();
   });
@@ -805,6 +1247,7 @@ function wire() {
 
 function boot() {
   if (!globalThis.isSecureContext || !globalThis.crypto?.subtle) {
+    ui.main.dataset.view = 'insecure';
     ui.insecure.hidden = false;
     ui.app.hidden = true;
     ui.how.hidden = true;
@@ -813,6 +1256,7 @@ function boot() {
   wire();
   registerServiceWorker();
   sweepLegacyStaging();
+  setBar({ state: 'empty' });
   show('pick');
   document.documentElement.dataset.ready = 'true';
 }

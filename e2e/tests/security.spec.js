@@ -109,7 +109,7 @@ test.describe('accessibility (axe, WCAG 2.1 AA)', () => {
         document
           .getAnimations()
           .filter((a) => a.effect.getTiming().iterations !== Infinity)
-          .map((a) => a.finished),
+          .map((a) => a.finished.catch(() => {})), // a cancelled transition rejects; that's fine
       ),
     );
     await page.addScriptTag({ content: await axeSource });
@@ -137,7 +137,13 @@ test.describe('accessibility (axe, WCAG 2.1 AA)', () => {
       await page.click('#encGo');
       expect(await audit(page), 'weak warning').toEqual([]);
       await page.click('#genBtn');
+      // Generating is async: wait for the result, or axe catches the button mid-change.
+      await expect(page.locator('#generated')).toBeVisible();
+      await expect(page.locator('#encGo')).toHaveClass(/btn-lock/);
       expect(await audit(page), 'generated').toEqual([]);
+      await page.click('#encGo');
+      await expect(page.locator('#messageText')).toContainText('Have you saved this passphrase?');
+      expect(await audit(page), 'passphrase not saved').toEqual([]);
       const download = page.waitForEvent('download');
       await page.click('#encGo');
       await download;
@@ -149,6 +155,16 @@ test.describe('accessibility (axe, WCAG 2.1 AA)', () => {
       await page.click('#decGo');
       await expect(page.locator('#message')).toBeVisible();
       expect(await audit(page), 'decrypt with error').toEqual([]);
+      const vectors = new URL('../../test/vectors/', import.meta.url);
+      await page.click('#clearBtn');
+      await pick(page, [new URL('v3-10000.vault', vectors).pathname, new URL('v2-1000.vault', vectors).pathname]);
+      await expect(page.locator('#stateTitle')).toHaveText('Decrypt 2 files');
+      expect(await audit(page), 'several vault files').toEqual([]);
+      await page.click('#clearBtn');
+      const other = await makeFile(work, 'b.txt', 10);
+      await pick(page, [src.path, other.path]);
+      await expect(page.locator('#fileListItems button')).toHaveCount(2);
+      expect(await audit(page), 'several files, list open').toEqual([]);
     });
   }
 
