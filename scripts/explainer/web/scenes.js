@@ -37,8 +37,8 @@
   };
   const icon = (name, size, sw = 1.7) =>
     `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" stroke-width="${sw}" aria-hidden="true">${P[name]}</svg>`;
-  const knot = (size, cls = "knot") =>
-    `<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 32 32" aria-hidden="true"><use href="#knot"/></svg>`;
+  const mark = (size) =>
+    `<svg class="icon-mark" width="${size}" height="${size}" viewBox="0 0 16 16" aria-hidden="true"><use href="#mark"/></svg>`;
 
   /* ------------------------------------------------------------------ *
    *  the seal, at film size: the app's geometry (ringPaths), drawn here
@@ -68,7 +68,7 @@
       })];
     };
     const [ghostG, ghost] = layer("ghost"), [inkG, ink] = layer("ink");
-    const mark = o.mark === false ? null : svg("use", { class: "mark", href: "#knot", x: 143, y: 142, width: 34, height: 34 }, s);
+    const mark = o.mark === false ? null : svg("use", { class: "mark", href: "#mark", x: 143, y: 142, width: 34, height: 34 }, s);
     if (mark) mark.style.transformOrigin = "160px 160px";
     const ripple = svg("circle", { cx: 160, cy: 160, r: 158, opacity: 0 }, s);
     ripple.style.transformOrigin = "160px 160px";
@@ -100,16 +100,6 @@
   };
   const popScale = (tau) => lerp(0.45, 1, outBack(ramp(tau, 0, 0.65), 1.9));
   const spinAngles = (spin, dir = 1) => TURN.map((v) => dir * v * spin);
-
-  /* the mark as one thin line: r = 10.2 + 2.9 cos(2.5 t), twice around */
-  function knotLine() {
-    let d = "";
-    for (let i = 0; i <= 240; i++) {
-      const t = (i / 240) * 2 * TAU, r = 10.2 + 2.9 * Math.cos(2.5 * t), th = t - Math.PI / 2;
-      d += `${i ? "L" : "M"}${(16 + r * Math.cos(th)).toFixed(2)} ${(16 + r * Math.sin(th)).toFixed(2)}`;
-    }
-    return d;
-  }
 
   /* camera: interpolate between keyframes [t, scale, x, y, dur] with an ease */
   function camera(cam, t, keys, drift = 1) {
@@ -290,17 +280,18 @@
   const liteSeal = (salt, size, weight) => { const s = sealNode(salt, size, { lite: true, weight }); s.set({ p: 1 }); return s.node.outerHTML; };
 
   /* ====================================================================== *
-   *  OPEN — one strand is drawn, woven, and a seal grows around it
+   *  OPEN — the two halves of the shield lock together, and a seal grows around it
    * ====================================================================== */
   function open(cam, api) {
     const SIZE = 640, K0 = 300, K1 = (SIZE * 34) / 320, CX0 = 960, CX1 = 470, CY = 540;
     const grp = el("div", "abs", cam);
     const S = sealNode(SPECIMEN, SIZE, { mark: false });
     at(grp, 0, 0, "").appendChild(S.node);
-    const kn = at(grp, 0, 0, "", `<svg class="knot" width="${K0}" height="${K0}" viewBox="0 0 32 32">
-      <path class="thin" d="${knotLine()}" pathLength="1" fill="none" stroke="currentColor" stroke-width="0.3" stroke-dasharray="1"/>
-      <use href="#knot"/></svg>`);
-    const thin = kn.querySelector(".thin"), woven = kn.querySelector("use");
+    const half = (id, points, fill) => `<clipPath id="${id}"><polygon points="${points}"/></clipPath>
+      <g><path clip-path="url(#${id})" fill="${fill}" d="${APP.shield.d}"/></g>`;
+    const kn = at(grp, 0, 0, "", `<svg class="icon-mark" width="${K0}" height="${K0}" viewBox="0 0 16 16">
+      ${half("opena", "0,0 16,0 0,16", APP.shield.fills[0])}${half("openb", "16,0 16,16 0,16", APP.shield.fills[1])}</svg>`);
+    const [ha, hb] = kn.querySelectorAll("g");
 
     const X = 880;
     const wm = el("div", "abs wordmark", cam, "VAULT".split("").map((c) => `<span>${c}</span>`).join(""));
@@ -328,11 +319,12 @@
       const m = inOutCubic(ramp(t, G0, G0 + 0.9));
       grp.style.transform = `translate(${lerp(CX0, CX1, m).toFixed(1)}px, ${CY}px)`;
 
-      // the strand: drawn thin, twice around, then inked into the knot
-      thin.style.strokeDashoffset = (1 - inOutCubic(ramp(t, J0, HIT - 0.1))).toFixed(4);
-      const w = ramp(t, HIT - 0.03, HIT + 0.07);
-      thin.style.opacity = (1 - w).toFixed(3);
-      woven.style.opacity = w.toFixed(3);
+      // the shield: its halves glide in along the diagonal and lock
+      const join = t < HIT ? inCubic(ramp(t, J0, HIT)) : 1, off = 9 * (1 - join);
+      ha.setAttribute("transform", `translate(${(-off).toFixed(3)} ${(-off).toFixed(3)})`);
+      hb.setAttribute("transform", `translate(${off.toFixed(3)} ${off.toFixed(3)})`);
+      ha.setAttribute("opacity", clamp(join * 3).toFixed(3));
+      hb.setAttribute("opacity", clamp(join * 3).toFixed(3));
       const punch = t > HIT ? Math.exp(-(t - HIT) * 8) * 0.1 : 0;
       const shrink = inOutCubic(ramp(t, G0, G0 + 0.85));
       const press = pressScale(t - STAMP);
@@ -556,7 +548,7 @@
     // a laptop, drawn in line
     svg("rect", { x: CX - 118, y: CY - 92, width: 236, height: 152, rx: 9, fill: "var(--surface)", stroke: "var(--ink)", "stroke-width": 2.5 }, dev);
     svg("rect", { x: CX - 156, y: CY + 68, width: 312, height: 12, rx: 6, fill: "var(--surface)", stroke: "var(--ink)", "stroke-width": 2.5 }, dev);
-    const mark = at(cam, CX, CY - 16, "", knot(84));
+    const icon = at(cam, CX, CY - 16, "", mark(84));
 
     const KEYS = [["uploaded", "Uploads", "everything stays in this tab"], ["accounts", "Accounts", "nothing to sign up for"],
       ["tracking", "Tracking", "no analytics, no third-party code"]];
@@ -583,7 +575,7 @@
       dev.setAttribute("opacity", Math.min(1, d * 2.5).toFixed(3));
       dev.setAttribute("transform", `translate(0 ${(28 * (1 - outQuint(d))).toFixed(1)})`);
       rim.setAttribute("transform", `rotate(${(t * 5).toFixed(2)} ${CX} ${CY})`);
-      reveal(mark, ramp(t, dv, dv + 0.5), { dy: 0, scale: 0.6, ease: outBack });
+      reveal(icon, ramp(t, dv, dv + 0.5), { dy: 0, scale: 0.6, ease: outBack });
       rows.forEach((r, i) => {
         r.row.style.opacity = ramp(t, 0.15 + i * 0.1, 0.6 + i * 0.1).toFixed(3);
         r.lbl.style.opacity = lerp(0.45, 1, ramp(t, r.t0 - 0.05, r.t0 + 0.2)).toFixed(3);
@@ -620,8 +612,7 @@
     const pieces = PX.map((x, i) => {
       const n = el("div", "piece", cam);
       n.innerHTML = `<div class="hx">${[0, 1, 2].map((r) => hex(i * 31 + r * 5, 4)).join("\n")}</div>
-        <div class="stamp">${knot(34)}</div><div class="idx">${i === 2 ? "0.4 MiB" : "1 MiB"}</div>`;
-      n.querySelector(".knot").style.color = "#fff";
+        <div class="stamp">${mark(30)}</div><div class="idx">${i === 2 ? "0.4 MiB" : "1 MiB"}</div>`;
       return { n, lk: n.querySelector(".stamp"), hx: n.querySelector(".hx"), x };
     });
     const aes = at(cam, 965, R2 - 132, "note");
@@ -692,7 +683,7 @@
         p.hx.style.opacity = lerp(1, 0.4, s).toFixed(3);
         const red = i === 1 ? ramp(t, CHG, CHG + 0.15) * (1 - ramp(t, CHG + 0.9, CHG + 1.4)) : 0;
         p.n.style.borderColor = red > 0.5 ? "var(--danger)" : "";
-        p.lk.style.background = red > 0.5 ? "var(--danger)" : "";
+        p.lk.style.borderColor = red > 0.5 ? "var(--danger)" : "";
       });
       reveal(tamper, ramp(t, CHG + 0.05, CHG + 0.4), { dy: 10, alpha: 1 - ramp(t, CHG + 1.2, CHG + 1.6) });
       file.style.opacity = lerp(1, 0.5, ramp(t, AES, AES + 0.6)).toFixed(3);

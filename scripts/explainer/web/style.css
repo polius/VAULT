@@ -4,7 +4,8 @@
 
    The film is set like the app (src/css/app.css): paper, one green ink, fine
    lines, the app's two typefaces. Corners are small, lines are thin, and there
-   are no shadows, glows or gradients. Green means sealed. */
+   are no shadows, glows or gradients. Green means sealed; the icon, a blue
+   and green shield, is the one other colour. */
 
 @font-face {
   font-family: "Archivo";
@@ -95,8 +96,8 @@ html, body {
 .fseal .micro { fill: var(--muted); stroke: none; font: 600 7.2px var(--sans); font-stretch: 125%; }
 .fseal .ghost { stroke: var(--field-line); opacity: 0.42; }
 .fseal .ink { stroke-dasharray: 1; }
-.fseal .mark { color: var(--seal); }
-.knot { display: block; overflow: visible; color: var(--seal); }
+.fseal .mark { stroke: none; }
+.icon-mark { display: block; overflow: visible; }
 
 /* ---- the header above the app (demo / decrypt) -------------------------------- */
 .caprow {
@@ -175,8 +176,8 @@ html, body {
 }
 .piece .hx { font: 500 13px/1.5 var(--mono); color: var(--muted); text-align: center; white-space: pre; margin-top: -18px; }
 .piece .idx { position: absolute; bottom: 9px; font: 500 14px var(--mono); color: var(--muted); }
-.stamp { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--seal); color: #fff; }
-.stamp svg { width: 34px; height: 34px; }
+.stamp { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 2px solid var(--seal); }
+.stamp svg { width: 30px; height: 30px; }
 .piece .stamp { position: absolute; top: 30px; }
 .keydisc { width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--paper); }
 

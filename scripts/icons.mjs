@@ -11,14 +11,10 @@ const ROOT = new URL('../', import.meta.url);
 const ASSETS = new URL('src/assets/', ROOT);
 const { chromium } = createRequire(new URL('e2e/package.json', ROOT))('@playwright/test');
 
-const svgText = await readFile(new URL('logo.svg', ASSETS), 'utf8');
-const dataUrl = (svg) => `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+const logo = `data:image/svg+xml;base64,${(await readFile(new URL('logo.svg', ASSETS))).toString('base64')}`;
 const BG = '#f1f3ee'; // --bg, light theme
 const INK = '#10201a'; // --ink
 const SEAL = '#0b7d5f'; // --seal
-// The mark in the page's green, and reversed for the app icons: a pale strand on a green tile.
-const logo = dataUrl(svgText);
-const logoOnSeal = dataUrl(svgText.replace(`color="${SEAL}"`, `color="${BG}"`).replace(/<style>[\s\S]*?<\/style>/, ''));
 
 // The preview image uses the page's own typeface when it is there.
 const font = await readFile(new URL('fonts/archivo.woff2', ASSETS)).catch(() => null);
@@ -28,10 +24,10 @@ const fontFace = font
        src:url(data:font/woff2;base64,${font.toString('base64')}) format('woff2')}</style>`
   : '';
 
-// A square with the mark centred. `scale` is the mark's share of the side.
-const square = (bg, mark, scale) => `
+// A square with the icon centred. `scale` is the icon's share of the side.
+const square = (bg, scale) => `
   <body style="margin:0;width:100vw;height:100vh;display:grid;place-items:center;background:${bg}">
-    <img src="${mark}" style="width:${scale * 100}vw;height:${scale * 100}vw">
+    <img src="${logo}" style="width:${scale * 100}vw;height:${scale * 100}vw">
   </body>`;
 
 const preview = `${fontFace}
@@ -48,11 +44,11 @@ const preview = `${fontFace}
 
 const OUTPUTS = [
   // iOS fills transparency with black and rounds the corners itself.
-  { file: 'apple-touch-icon.png', size: 180, html: square(SEAL, logoOnSeal, 0.7) },
-  { file: 'icon-192.png', size: 192, html: square('transparent', logo, 0.92) },
-  { file: 'icon-512.png', size: 512, html: square('transparent', logo, 0.92) },
+  { file: 'apple-touch-icon.png', size: 180, html: square(BG, 0.72) },
+  { file: 'icon-192.png', size: 192, html: square('transparent', 0.9) },
+  { file: 'icon-512.png', size: 512, html: square('transparent', 0.9) },
   // Launchers crop maskable icons to a circle 80% of the side wide.
-  { file: 'icon-maskable-512.png', size: 512, html: square(SEAL, logoOnSeal, 0.56) },
+  { file: 'icon-maskable-512.png', size: 512, html: square(BG, 0.56) },
   { file: 'og.png', width: 1200, height: 630, html: preview },
 ];
 
