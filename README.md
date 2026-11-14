@@ -35,9 +35,7 @@ The recommended installation method is **Docker**. The image is a static nginx s
 #### Run with Docker CLI
 
 ```bash
-docker run -d --name vault -p 80:8080 \
-  --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges \
-  poliuscorp/vault
+docker run -d --name vault -p 80:8080 poliuscorp/vault
 ```
 
 #### Run with Docker Compose
@@ -49,17 +47,8 @@ services:
     container_name: vault
     ports:
       - "80:8080"
-    read_only: true
-    tmpfs:
-      - /tmp
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
     restart: unless-stopped
 ```
-
-The extra lines are the hardening [SECURITY.md](SECURITY.md) recommends: a read-only filesystem, no Linux capabilities and no privilege escalation. VAULT needs none of them.
 
 `poliuscorp/vault` follows the latest release. To run exactly the image you checked, pin it by version and digest, for example `poliuscorp/vault:2.0.3@sha256:…` (the digest is on [Docker Hub](https://hub.docker.com/r/poliuscorp/vault/tags) or from `docker buildx imagetools inspect poliuscorp/vault:2.0.3`). Pinning means updates only arrive when you change the line, which is what you want if the server is part of your threat model.
 
