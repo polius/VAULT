@@ -1,5 +1,5 @@
 <div align="center">
-<img src="src/assets/logo.svg" alt="" width="45">
+<img src="src/assets/logo.svg" alt="" width="64">
 <h1 align="center">VAULT</h1>
 
 **Encrypt files locally.** Lock any file or folder with a password, right in your browser.<br>
@@ -12,7 +12,7 @@ Nothing is ever uploaded.
 <a href="https://pol.alzina.dev/videos/vault.mp4"><img src="docs/assets/video-poster.png" alt="Watch the VAULT video: a one-minute walkthrough of encrypting and decrypting a file"></a>
 
 <p align="center">
-<a href="https://vault.alzina.dev"><b>Try it at vault.alzina.dev</b></a> · <a href="#installation">Self-host</a> · <a href="#security-model">How it's secured</a>
+<a href="https://vault.alzina.dev"><b>Try it at vault.alzina.dev</b></a> · <a href="#installation">Self-host</a> · <a href="SECURITY.md">How it's secured</a>
 </p>
 </div>
 
@@ -51,8 +51,6 @@ services:
     restart: unless-stopped
 ```
 
-`poliuscorp/vault` follows the latest release. To run exactly the image you checked, pin it by version and digest, for example `poliuscorp/vault:2.1.0@sha256:…` (the digest is on [Docker Hub](https://hub.docker.com/r/poliuscorp/vault/tags) or from `docker buildx imagetools inspect poliuscorp/vault:2.1.0`). Pinning means updates only arrive when you change the line, which is what you want if the server is part of your threat model.
-
 > [!IMPORTANT]
 > Browsers only allow the cryptography VAULT needs on **HTTPS** pages (or `http://localhost`). Served over plain HTTP from another machine, VAULT shows a notice instead of working. For anything beyond your own computer, use the HTTPS setup below or put VAULT behind your existing reverse proxy.
 
@@ -80,31 +78,6 @@ Proxy to the container's port 8080. VAULT sends its own security headers (Conten
 #### Static hosting
 
 `src/` is a plain static site with no build step, so you can serve it from any static host. The CSP is also set in a `<meta>` tag, but for the full set of headers copy the ones in [`nginx.conf`](nginx.conf) into your host's configuration.
-
-## Using VAULT
-
-Once deployed, visit `http://localhost/` (or your HTTPS domain).
-
-- **Encrypt:** drop files or a folder, type a password twice (or generate a passphrase and copy it somewhere safe), and click **Encrypt**. Under **Options** you can give the output a neutral name so the file name doesn't reveal what's inside.
-- **Decrypt:** drop a `.vault` file, type the password, and click **Decrypt**. Multi-file vaults come back as a ZIP.
-
-There is no password recovery. If you lose the password, the data is gone.
-
-### Browser support
-
-VAULT works in current Chrome, Edge, Firefox and Safari. How the result is saved depends on the browser:
-
-| Browser                                                                                   | How the result is saved                                      | Size limit                                                 |
-| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
-| Chrome, Edge and other Chromium browsers on a computer                                    | A save dialog, then written straight to the file you chose   | None in practice                                           |
-| Firefox, Safari, and Chrome on Android                                                    | Streamed to the browser's downloads through a Service Worker | None in practice                                           |
-| Any browser where neither works (for example with the Service Worker blocked or bypassed) | Held in memory, then offered as a download                   | VAULT warns above 512 MB; the device's memory is the limit |
-
-On phones, use **Choose files**. **Choose a folder** depends on the browser's folder picker, which mobile browsers support unevenly; if it does nothing, pick the files themselves.
-
-## Security model
-
-In short: everything happens in your browser, and nothing you drop on the page is sent anywhere. The server only delivers static files, and the page's Content-Security-Policy forbids it from connecting anywhere but its own origin. VAULT protects your files at rest and in transit; it can't protect against a compromised device or browser, or against a server that's been changed to deliver malicious code. Read [SECURITY.md](SECURITY.md) for the details and for how to report a vulnerability.
 
 ## License
 
