@@ -32,7 +32,7 @@ Only the latest release is supported.
 
 - Serve VAULT over HTTPS. Browsers disable the Web Crypto API on insecure origins (other than `localhost`), and without HTTPS the code you receive can be modified in transit.
 - Keep the headers in [`nginx.conf`](nginx.conf), and turn off any feature of a CDN or proxy that rewrites pages or injects scripts (for example Cloudflare's Rocket Loader, Email Address Obfuscation or Web Analytics auto-injection): the CSP will block the injected code and parts of the page may break.
-- The container runs as an unprivileged user and works with a read-only root filesystem; [`deploy/docker-compose.yml`](deploy/docker-compose.yml) shows the recommended hardening.
+- The container runs as an unprivileged user, and also works with a read-only root filesystem (`--read-only --tmpfs /tmp`) if you want it.
 
 ### Check a deployment against a release
 
