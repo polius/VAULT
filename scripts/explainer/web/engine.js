@@ -241,6 +241,18 @@
   window.__cues = () => CUES;
   window.__duration = () => (TL ? TL.d.video_end : 0);
   window.__poster = function () {
-    el("div", "", document.getElementById("stage")).id = "poster-play";
+    // README thumbnail: no header above the app, and a play button at the centre of
+    // the seal, where the mark sits (the app's seal if the app is on screen)
+    document.querySelectorAll(".caprow").forEach((n) => { n.style.display = "none"; });
+    document.querySelectorAll(".win .chrome").forEach((n) => { n.style.visibility = "hidden"; });
+    const play = el("div", "", document.getElementById("stage"));
+    play.id = "poster-play";
+    const layer = built.find((b) => b.layer.style.display !== "none" && b.layer.querySelector("iframe"));
+    if (layer) {
+      const frame = layer.layer.querySelector("iframe"), box = frame.getBoundingClientRect();
+      const seal = frame.contentDocument.getElementById("seal").getBoundingClientRect(), k = box.width / frame.offsetWidth;
+      play.style.left = box.left + (seal.left + seal.width / 2) * k + "px";
+      play.style.top = box.top + (seal.top + seal.height / 2) * k + "px";
+    }
   };
 })();
