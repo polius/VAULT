@@ -211,7 +211,7 @@ html, body {
    moves it onto the app's seal when the app is on screen (__poster). */
 #poster-play { position: absolute; left: 470px; top: 540px; width: 0; height: 0; z-index: 1000; }
 #poster-play::before {
-  content: ""; position: absolute; left: -84px; top: -84px; width: 168px; height: 168px;
+  content: ""; position: absolute; left: -94px; top: -94px; width: 188px; height: 188px; box-sizing: border-box;
   border-radius: 50%; background: var(--seal); border: 10px solid var(--paper);
 }
 #poster-play::after {
