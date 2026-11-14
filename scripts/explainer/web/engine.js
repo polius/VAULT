@@ -241,18 +241,25 @@
   window.__cues = () => CUES;
   window.__duration = () => (TL ? TL.d.video_end : 0);
   window.__poster = function () {
-    // README thumbnail: no header above the app, and a play button at the centre of
-    // the seal, where the mark sits (the app's seal if the app is on screen)
+    // README thumbnail: a play button at the centre of the seal on screen, where the
+    // mark sits. If the app is on screen it is the app's seal, without the film's header.
     document.querySelectorAll(".caprow").forEach((n) => { n.style.display = "none"; });
     document.querySelectorAll(".win .chrome").forEach((n) => { n.style.visibility = "hidden"; });
     const play = el("div", "", document.getElementById("stage"));
     play.id = "poster-play";
-    const layer = built.find((b) => b.layer.style.display !== "none" && b.layer.querySelector("iframe"));
-    if (layer) {
-      const frame = layer.layer.querySelector("iframe"), box = frame.getBoundingClientRect();
-      const seal = frame.contentDocument.getElementById("seal").getBoundingClientRect(), k = box.width / frame.offsetWidth;
-      play.style.left = box.left + (seal.left + seal.width / 2) * k + "px";
-      play.style.top = box.top + (seal.top + seal.height / 2) * k + "px";
+    const shown = built.filter((b) => b.layer.style.display !== "none").map((b) => b.layer);
+    const frame = shown.map((l) => l.querySelector("iframe")).find(Boolean);
+    let at = null;
+    if (frame) {
+      const box = frame.getBoundingClientRect(), k = box.width / frame.offsetWidth;
+      const seal = frame.contentDocument.getElementById("seal").getBoundingClientRect();
+      at = [box.left + (seal.left + seal.width / 2) * k, box.top + (seal.top + seal.height / 2) * k];
+    } else {
+      // the largest seal the film itself has drawn
+      const seals = shown.flatMap((l) => [...l.querySelectorAll(".fseal")]).map((n) => n.getBoundingClientRect());
+      const big = seals.sort((a, b) => b.width - a.width)[0];
+      if (big) at = [big.left + big.width / 2, big.top + big.height / 2];
     }
+    if (at) { play.style.left = at[0] + "px"; play.style.top = at[1] + "px"; }
   };
 })();

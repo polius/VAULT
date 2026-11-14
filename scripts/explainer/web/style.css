@@ -208,7 +208,7 @@ html, body {
 
 /* ---- poster affordance (README thumbnail only, never in the video) -------
    A play button at the centre of the seal, where the mark sits. The engine
-   moves it onto the app's seal when the app is on screen (__poster). */
+   places it on the seal that is on screen (__poster). */
 #poster-play { position: absolute; left: 470px; top: 540px; width: 0; height: 0; z-index: 1000; }
 #poster-play::before {
   content: ""; position: absolute; left: -94px; top: -94px; width: 188px; height: 188px; box-sizing: border-box;
