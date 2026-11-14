@@ -36,7 +36,7 @@ LANG = "en-us"
 
 # ---- pacing ----------------------------------------------------------------
 FPS = int(os.environ.get("FPS", "60"))
-LEAD_IN = 2.3              # the cold open: the shield locks together before any voice
+LEAD_IN = 2.3              # the cold open: the mark is drawn and inked before any voice
 GAP_SAME = 0.45            # pause between two lines in the same scene
 GAP_SCENE = 1.2            # pause when the scene changes: long enough to finish
                            # reading, short enough to keep a promo's momentum
@@ -44,11 +44,12 @@ TAIL = 3.2                 # hold after the last line (settled end card)
 # extra hold before a line (on top of the normal gap), to let a visual land
 GAP_EXTRA = {
     "demo2": 0.75,         # the file lands and the form opens
-    "demo3": 0.85,         # the passphrase and the meter settle
-    "local1": 0.9,         # the file finishes encrypting before the cut
+    "demo3": 1.0,          # the passphrase settles and is copied
+    "demo4": 0.6,          # the seal is pressed
+    "local1": 0.3,
     "inside2": 0.45,       # the key is made before it seals anything
     "share2": 0.55,        # the copies land
-    "decrypt2": 0.95,      # the password is checked and the file comes back
+    "decrypt2": 1.5,       # the password is checked and the rings stop, one by one
     "self2": 0.1,
     "outro2": -0.3,        # keep the closing line close to the name
 }
@@ -71,8 +72,10 @@ LINES = [
      {"drop": "Drop", "folder": "folder"}),
     ("demo2", "demo", "Pick a password, or let Vault make a strong one for you.",
      {"pick": "Pick", "make": "make"}),
-    ("demo3", "demo", "Press Encrypt, and your file is sealed.",
+    ("demo3", "demo", "Press Encrypt, and watch your file being sealed.",
      {"encrypt": "Encrypt", "sealed": "sealed"}),
+    ("demo4", "demo", "Every file gets a seal of its own.",
+     {"seal": "a seal", "own": "own"}),
     ("local1", "local", "It all happens on your device. Nothing is uploaded. No accounts. No tracking.",
      {"device": "your device", "uploaded": "Nothing", "accounts": "No accounts", "tracking": "No tracking"}),
     ("inside1", "inside", "Under the hood, Argon2 turns your password into a key that is slow to guess.",
@@ -85,8 +88,8 @@ LINES = [
      {"without": "Without", "noise": "noise"}),
     ("decrypt1", "decrypt", "To open it, drop it back in and type the password.",
      {"drop": "drop", "type": "type"}),
-    ("decrypt2", "decrypt", "Your file is back, exactly as it was.",
-     {"back": "back"}),
+    ("decrypt2", "decrypt", "The seal breaks, and your file is back, exactly as it was.",
+     {"breaks": "breaks", "back": "back"}),
     ("self1", "selfhost", "Vault is free and open source.",
      {"free": "free", "open": "open source"}),
     ("self2", "selfhost", "Run your own copy with a single Docker command.",

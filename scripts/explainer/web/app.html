@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-ready="true">
+<head>
+  <meta charset="utf-8">
+  <title>VAULT, as shown in the film</title>
+  <!-- The app's own stylesheet. The film fills <body> with screens recorded from
+       the real app (states.py) and moves only what moves. -->
+  <link rel="stylesheet" href="/src/css/app.css">
+  <style>
+    /* Every frame is a function of the film's clock: nothing may move by itself. */
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    html { overflow: hidden; }
+    input { caret-color: transparent; }
+  </style>
+</head>
+<body></body>
+</html>

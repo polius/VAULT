@@ -1,12 +1,14 @@
-/* VAULT video — deterministic render engine.
+/* VAULT film — deterministic render engine.
  *
  * Everything on screen is a pure function of the video timestamp t. The capture
  * harness calls window.__render(t) once per frame and screenshots the page; no
  * wall-clock animation is ever used, so every frame is reproducible.
  *
  * Scenes register into window.SCENES (see scenes.js). Each gets its own layer
- * with an inner camera; the engine owns the cuts between layers, the shared
- * background, the accent colour and the sound-effect cue list.
+ * with an inner camera; the engine owns the cuts between layers, the ground
+ * they sit on and the sound-effect cue list. It also loads what the scenes
+ * borrow from the app itself: the mark, the seal's geometry and the recorded
+ * screens (states.py).
  */
 (function () {
   const SCENES = (window.SCENES = {});
@@ -28,19 +30,17 @@
   // seeded noise, so "random" things are identical on every render
   function rnd(i) { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
 
-  /* fade + rise (+ scale, + a short de-blur) from p = 0..1 */
+  /* fade + rise (+ scale) from p = 0..1 */
   function reveal(node, p, o = {}) {
     if (!node) return p;
     const e = (o.ease || outQuint)(p);
     if (p <= 0) { node.style.visibility = "hidden"; return p; }
     node.style.visibility = "visible";
-    node.style.opacity = clamp(e * (o.alpha ?? 1)).toFixed(4);
+    node.style.opacity = clamp(Math.min(1, p * 3) * (o.alpha ?? 1)).toFixed(4);
     const dy = (o.dy ?? 30) * (1 - e), dx = (o.dx ?? 0) * (1 - e);
     const sc = lerp(o.scale ?? 1, 1, e);
     const base = o.base || "";
     node.style.transform = `${base} translate3d(${dx.toFixed(2)}px, ${dy.toFixed(2)}px, 0) scale(${sc.toFixed(4)})`;
-    const bl = (o.blur ?? 0) * (1 - e);
-    node.style.filter = bl > 0.3 ? `blur(${bl.toFixed(2)}px)` : "none";
     return p;
   }
   function hide(node) { node.style.visibility = "hidden"; }
@@ -84,12 +84,12 @@
   function kin(spans, t, t0, stagger = 0.06, dur = 0.55, out = null) {
     spans.forEach((s, i) => {
       const p = outQuint(ramp(t, t0 + i * stagger, t0 + i * stagger + dur));
-      let y = (1 - p) * 140, r = (1 - p) * 4;
+      let y = (1 - p) * 125;
       if (out != null) {  // and leave upward
         const q = inCubic(ramp(t, out + i * stagger * 0.5, out + i * stagger * 0.5 + 0.35));
-        y -= q * 140;
+        y -= q * 125;
       }
-      s.style.transform = `translateY(${y.toFixed(2)}%) rotate(${r.toFixed(2)}deg)`;
+      s.style.transform = `translateY(${y.toFixed(2)}%)`;
     });
   }
 
@@ -100,16 +100,29 @@
   function afterFonts(fn) { AFTER_FONTS.push(fn); }
   function settleFonts() { if (!fontsSettled) { fontsSettled = true; AFTER_FONTS.forEach((fn) => fn()); } }
 
+  // ---- borrowed from the app -----------------------------------------------------
+  const APP = { ringPaths: null, states: null };   // filled by __init
+  const PENDING = [];                               // things scenes are still loading (app windows)
+
+  /* One wavy strand around (cx, cy): the curve every seal ring is made of. */
+  function strand(cx, cy, radius, amp, waves, phase, harmonic, steps) {
+    let d = "";
+    for (let i = 0; i < steps; i++) {
+      const a = (i / steps) * Math.PI * 2;
+      const r = radius + amp * Math.sin(waves * a + phase) + harmonic * amp * Math.sin(2 * waves * a + 2 * phase + 1.1);
+      d += `${i ? "L" : "M"}${(cx + r * Math.cos(a)).toFixed(1)} ${(cy + r * Math.sin(a)).toFixed(1)}`;
+    }
+    return d + "Z";
+  }
+
   const A = { clamp, lerp, ramp, rnd, outQuint, outCubic, outExpo, inCubic, inOutCubic, inOutSine,
-              outBack, spring, reveal, hide, el, svg, at, setText, setHTML, words, kin, afterFonts };
+              outBack, spring, reveal, hide, el, svg, at, setText, setHTML, words, kin, afterFonts,
+              strand, APP, PENDING };
   window.Toolkit = A;
 
-  // ---- timeline, cues, accent ------------------------------------------------
+  // ---- timeline, cues ----------------------------------------------------------
   let TL = null;
   const CUES = [];                 // sound effects: { t, type, gain }
-  const ACCENT_KEYS = [];          // { t, rgb }
-  const hex2rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-  const BRAND = "#5b9bff";     // the app's encrypt blue (dark theme)
 
   function api(scene, layer, cam) {
     const t0 = scene.start;
@@ -120,63 +133,45 @@
       segStart: (id) => TL.byId[id].start - t0,
       segEnd: (id) => TL.byId[id].end - t0,
       cue: (type, t, gain = 1) => CUES.push({ t: +(t0 + t).toFixed(3), type, gain }),
-      accent: (t, hex) => ACCENT_KEYS.push({ t: t0 + t, rgb: hex2rgb(hex) }),
     }, A);
   }
 
-  function accentAt(t) {
-    let c = hex2rgb(BRAND);
-    for (const k of ACCENT_KEYS) {
-      if (t < k.t) break;
-      const p = inOutCubic(ramp(t, k.t, k.t + 0.7));
-      c = c.map((v, i) => lerp(v, k.rgb[i], p));
-    }
-    return c;
+  // ---- the ground ------------------------------------------------------------------
+  // rings of the medallion: [radius, amplitude, waves, strands, second harmonic, direction, drift deg/s]
+  const RINGS = [
+    [742, 46, 30, 5, 0.3, 1, 0.5],
+    [905, 54, 38, 6, 0, -1, 0.36],
+    [1085, 62, 46, 6, 0.4, 1, 0.26],
+  ];
+  const ROSE = [];
+  function buildGround() {
+    const g = document.querySelector("#bg .rosette");
+    RINGS.forEach(([r, amp, waves, n, h, dir, speed]) => {
+      const ring = svg("g", {}, g);
+      for (let k = 0; k < n; k++) {
+        svg("path", { d: strand(960, 540, r, amp, waves, (dir * Math.PI * 2 * k) / n, h, Math.round(r * 2.6)) }, ring);
+      }
+      svg("circle", { cx: 960, cy: 540, r: r - amp - 32, class: "hair" }, ring);
+      ROSE.push([ring, dir, speed, waves]);
+    });
   }
-
-  // ---- background ---------------------------------------------------------------
-  const DUST = 34;
-  function paintBackground(t) {
-    const bg = document.getElementById("bg");
-    const g1 = bg.querySelector(".g1"), g2 = bg.querySelector(".g2");
-    g1.style.transform = `translate(${(-420 + 160 * Math.sin(t * 0.13)).toFixed(1)}px, ${(-860 + 120 * Math.cos(t * 0.11)).toFixed(1)}px)`;
-    g2.style.transform = `translate(${(980 + 140 * Math.sin(t * 0.09 + 2)).toFixed(1)}px, ${(-120 + 110 * Math.sin(t * 0.07 + 1)).toFixed(1)}px)`;
-    // the dial drifts, and every cut turns it a notch (alternate rings, opposite ways)
+  function paintGround(t) {
+    // every cut turns the rings a notch, alternate rings opposite ways
     let notch = 0;
     for (let i = 1; i < built.length; i++) {
       const s0 = built[i].scene.start;
-      notch += outBack(ramp(t, s0 - 0.3, s0 + 0.5), 1.2);
+      notch += inOutCubic(ramp(t, s0 - 0.35, s0 + 0.55));
     }
-    DIAL.forEach(([ring, dir, speed], i) => {
-      const a = dir * (t * speed + notch * (i % 2 ? 9 : 15));
-      ring.setAttribute("transform", `rotate(${a.toFixed(3)} 960 1240)`);
+    ROSE.forEach(([ring, dir, speed, waves]) => {
+      const a = dir * (t * speed + notch * (720 / waves));
+      ring.setAttribute("transform", `rotate(${a.toFixed(3)} 960 540)`);
     });
-    const dots = bg.querySelector(".dust").children;
-    for (let i = 0; i < dots.length; i++) {
-      const sp = 8 + rnd(i + 3) * 18;
-      const x = rnd(i) * 1920 + 30 * Math.sin(t * 0.3 + i);
-      const y = (((rnd(i + 11) * 1200 - t * sp) % 1200) + 1200) % 1200 - 60;
-      const tw = 0.25 + 0.55 * (0.5 + 0.5 * Math.sin(t * (0.6 + rnd(i + 7)) + i * 2.1));
-      const s = 0.5 + rnd(i + 5) * 1.3;
-      dots[i].style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${s.toFixed(2)})`;
-      dots[i].style.opacity = (tw * 0.55).toFixed(3);
-    }
-  }
-
-  // concentric rings of ticks: [radius, stroke width, dash, opacity, direction, drift deg/s]
-  const DIAL = [];
-  function buildDial() {
-    const g = document.querySelector("#bg .dial");
-    [[560, 2.5, "2 26", 0.22, 1, 0.8], [700, 16, "2.5 11", 0.09, -1, 0.5], [770, 2.5, "70 22", 0.14, 1, 0.35],
-     [930, 4, "3 40", 0.17, -1, 0.3], [1120, 2, "1.5 14", 0.14, 1, 0.2]].forEach(([r, w, dash, op, dir, sp]) => {
-      const c = svg("circle", { cx: 960, cy: 1240, r, "stroke-width": w, "stroke-dasharray": dash, opacity: op }, g);
-      DIAL.push([c, dir, sp]);
-    });
+    document.getElementById("bg").style.opacity = ramp(t, 0, 0.9).toFixed(3);
   }
 
   // ---- build + render -----------------------------------------------------------
   let built = null;
-  const CUT_OUT = 0.32, CUT_IN = 0.5;     // the push-through at every scene change
+  const CUT_OUT = 0.3, CUT_IN = 0.5;     // every scene change: one sheet lifts away, the next settles
 
   function build() {
     const root = document.getElementById("scenes");
@@ -185,85 +180,67 @@
       const layer = el("div", "layer", root);
       layer.style.zIndex = 10 + idx;
       const cam = el("div", "cam", layer);
-      ACCENT_KEYS.push({ t: scene.start, rgb: hex2rgb(BRAND) });
       const render = SCENES[scene.name](cam, api(scene, layer, cam));
       built.push({ scene, layer, render });
-      if (idx > 0) CUES.push({ t: +(scene.start - 0.28).toFixed(3), type: "whoosh", gain: 1 });
+      if (idx > 0) CUES.push({ t: +(scene.start - 0.28).toFixed(3), type: "whoosh", gain: 0.8 });
     });
-    ACCENT_KEYS.sort((a, b) => a.t - b.t);
     CUES.sort((a, b) => a.t - b.t);
   }
 
   function render(t) {
     settleFonts();
-    const acc = accentAt(t);
-    const rs = document.documentElement.style;
-    rs.setProperty("--accent", `rgb(${acc.map(Math.round).join(",")})`);
-    rs.setProperty("--accent-l", `rgb(${acc.map((v) => Math.round(lerp(v, 255, 0.4))).join(",")})`);
-    paintBackground(t);
-
+    paintGround(t);
     for (let i = 0; i < built.length; i++) {
       const { scene: s, layer, render: r } = built[i];
       const last = i === built.length - 1;
-      const outP = last ? 0 : ramp(t, s.end - CUT_OUT, s.end + 0.04);
-      const inP = i === 0 ? 1 : ramp(t, s.start - 0.04, s.start + CUT_IN);
+      const outP = last ? 0 : ramp(t, s.end - CUT_OUT, s.end + 0.02);
+      const inP = i === 0 ? 1 : ramp(t, s.start - 0.02, s.start + CUT_IN);
       // display, not visibility: a revealed child would show through a hidden parent
       if (outP >= 1 || inP <= 0) { layer.style.display = "none"; continue; }
       layer.style.display = "";
       const eo = inCubic(outP), ei = outQuint(inP);
-      layer.style.opacity = ((1 - eo) * ei).toFixed(4);
-      const sc = lerp(1, 1.14, eo) * lerp(0.9, 1, ei);
-      layer.style.transform = `scale(${sc.toFixed(5)})`;
-      const bl = 10 * eo + 8 * (1 - ei);
-      layer.style.filter = bl > 0.4 ? `blur(${bl.toFixed(2)}px)` : "none";
+      layer.style.opacity = ((1 - eo) * Math.min(1, inP * 2.5)).toFixed(4);
+      layer.style.transform = `translateY(${(-36 * eo + 44 * (1 - ei)).toFixed(2)}px)`;
       r(t - s.start, t);
     }
-
-    // a light sweep rides every cut
-    const sw = document.getElementById("sweep");
-    let swp = -1;
-    for (let i = 1; i < built.length; i++) {
-      const s0 = built[i].scene.start;
-      if (t > s0 - 0.35 && t < s0 + 0.45) swp = ramp(t, s0 - 0.35, s0 + 0.45);
-    }
-    if (swp >= 0) {
-      sw.style.opacity = Math.sin(Math.PI * swp).toFixed(3);
-      sw.style.transform = `translateX(${lerp(-1300, 2600, inOutSine(swp)).toFixed(1)}px) rotate(45deg)`;
-    } else sw.style.opacity = 0;
-
-    const fadeIn = ramp(t, 0, 0.5);
-    const fadeOut = 1 - ramp(t, TL.d.video_end - 1.2, TL.d.video_end - 0.05);
-    document.getElementById("blackout").style.opacity = (1 - Math.min(fadeIn, fadeOut)).toFixed(4);
   }
 
   // ---- capture API --------------------------------------------------------------
+  async function loadMark() {
+    // the mark, straight from the app: a mask (the weave) and the strand
+    const text = await (await fetch("/src/assets/logo.svg")).text();
+    const src = new DOMParser().parseFromString(text, "image/svg+xml").documentElement;
+    const sym = svg("symbol", { id: "knot", viewBox: "0 0 32 32" }, document.getElementById("sprite"));
+    for (const n of [...src.children]) if (n.tagName === "mask" || n.tagName === "g") sym.appendChild(document.importNode(n, true));
+  }
+
   window.__init = function (data) {
     const byId = {};
     data.segments.forEach((s) => (byId[s.id] = s));
     TL = { d: data, byId, scenes: data.scenes };
-    const dust = document.querySelector("#bg .dust");
-    for (let i = 0; i < DUST; i++) el("i", "", dust);
-    buildDial();
-    build();
-    window.__ready = Promise.all([
-      document.fonts.load('800 132px "Inter"'),
-      document.fonts.load('400 20px "Inter"'),
-      document.fonts.load('700 46px "JBMono"'),
-    ]).then(() => document.fonts.ready).then(() => true);
+    window.__ready = (async () => {
+      const [seal, states] = await Promise.all([
+        import("/src/js/seal.js"),
+        fetch("states.json").then((r) => r.json()),
+        loadMark(),
+        document.fonts.load('640 96px "Archivo"'),
+        document.fonts.load('500 20px "JetBrains Mono"'),
+      ]);
+      APP.ringPaths = seal.ringPaths;
+      APP.sealNumber = seal.sealNumber;
+      APP.states = states;
+      buildGround();
+      build();
+      await Promise.all(PENDING);
+      await document.fonts.ready;
+      return true;
+    })();
+    return window.__ready;
   };
   window.__render = render;
   window.__cues = () => CUES;
   window.__duration = () => (TL ? TL.d.video_end : 0);
   window.__poster = function () {
-    // a still can afford one continuous gradient per line (the video paints it per word)
-    document.querySelectorAll(".grad").forEach((line) => {
-      const lr = line.getBoundingClientRect();
-      line.querySelectorAll(".kt > span").forEach((w) => {
-        const r = w.getBoundingClientRect();
-        w.style.backgroundSize = `${lr.width.toFixed(1)}px 100%`;
-        w.style.backgroundPosition = `${(lr.left - r.left).toFixed(1)}px 0`;
-      });
-    });
     el("div", "", document.getElementById("stage")).id = "poster-play";
   };
 })();

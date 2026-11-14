@@ -2,23 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>VAULT video</title>
+  <title>VAULT film</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- the mark (src/assets/logo.svg), put here by the engine as #knot -->
+  <svg class="sprite" aria-hidden="true"><defs id="sprite"></defs></svg>
   <div id="stage">
     <div id="bg">
-      <div class="glow g1"></div>
-      <div class="glow g2"></div>
-      <!-- a vault dial: it turns a notch at every cut, like a combination lock -->
-      <svg class="dial" width="1920" height="1080" viewBox="0 0 1920 1080"></svg>
-      <div class="dust"></div>
-      <div class="vignette"></div>
+      <!-- a medallion of fine lines around the frame, like the ground of a banknote:
+           it drifts, and turns a notch at every cut -->
+      <svg class="rosette" width="1920" height="1080" viewBox="0 0 1920 1080"></svg>
     </div>
     <div id="scenes"></div>
-    <!-- the seam of light that rides every cut, on the shield's diagonal -->
-    <div id="sweep"></div>
-    <div id="blackout"></div>
   </div>
   <script src="engine.js"></script>
   <script src="scenes.js"></script>

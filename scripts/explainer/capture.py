@@ -22,7 +22,10 @@ import subprocess
 import threading
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-WEB = os.path.join(HERE, "web")
+# The whole repository is served: the film's page (web/) uses the app's own
+# stylesheet, fonts and seal code from src/.
+ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
+PAGE = "scripts/explainer/web/index.html"
 
 
 class _Handler(http.server.SimpleHTTPRequestHandler):
@@ -46,7 +49,7 @@ def new_page(pw, port, scale):
     ])
     page = browser.new_page(viewport={"width": 1920, "height": 1080},
                             device_scale_factor=scale)
-    page.goto(f"http://127.0.0.1:{port}/index.html", wait_until="load")
+    page.goto(f"http://127.0.0.1:{port}/{PAGE}", wait_until="load")
     return browser, page
 
 
@@ -106,7 +109,7 @@ def main():
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as pw:
-        httpd, port = serve(WEB)
+        httpd, port = serve(ROOT)
         try:
             if args.poster is not None:
                 capture_poster(pw, port, timeline, float(args.poster),

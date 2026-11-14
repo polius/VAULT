@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Build the VAULT video end to end.
 
-  narration (Kokoro) -> timeline.json -> cues.json -> headless-Chromium frames ->
-  voice + ducked score + sound design -> h264 -> vault-video.mp4 (+ captions)
+  narration (Kokoro) -> timeline.json -> the app's screens -> cues.json ->
+  headless-Chromium frames -> voice + ducked score + sound design -> h264 ->
+  vault-video.mp4 (+ captions)
 
 Run it from anywhere; paths are resolved relative to this file.
 
@@ -78,8 +79,9 @@ def main():
     ap.add_argument("--scale", type=int, default=2, help="capture supersample factor")
     ap.add_argument("--workers", type=int, default=min(8, max(1, (os.cpu_count() or 4) - 2)),
                     help="parallel capture processes")
-    ap.add_argument("--crf", type=int, default=17)
-    ap.add_argument("--grain", type=int, default=3, help="film grain strength (0 = off)")
+    ap.add_argument("--crf", type=int, default=20)
+    ap.add_argument("--grain", type=int, default=0,
+                    help="film grain strength; off by default: the film is flat paper, with no gradients to band")
     ap.add_argument("--skip-narration", action="store_true")
     ap.add_argument("--skip-capture", action="store_true")
     ap.add_argument("--no-music", action="store_true")
@@ -92,7 +94,16 @@ def main():
     args = ap.parse_args()
     capture_py = os.path.join(HERE, "capture.py")
 
+    # the app's own screens, recorded from a real run (the film shows these)
+    states = os.path.join(HERE, "web", "states.json")
+
+    def record_states(force):
+        if force or not os.path.exists(states):
+            run([PY, os.path.join(HERE, "states.py"), "--out", states])
+
     # 0) stills (visual iteration / README art — no audio, no encode) --------
+    if args.preview is not None or args.poster is not None:
+        record_states(False)
     if args.preview is not None:
         run([PY, capture_py, "--preview", args.preview, "--scale", "1"])
         return
@@ -104,22 +115,26 @@ def main():
 
     # 1) narration -> audio/*.wav + narration.wav + timeline.json -------------
     if not args.skip_narration:
-        print("[1/7] narration")
+        print("[1/8] narration")
         run([PY, os.path.join(HERE, "narration.py")])
     timeline = json.load(open(args.timeline))
     dur, fps = timeline["video_end"], timeline["fps"]
     total_frames = int(round(dur * fps))
     print(f"      {dur:.2f}s @ {fps}fps  = {total_frames} frames")
 
-    # 2) the scenes' sound-effect cues ----------------------------------------
-    print("[2/7] cues")
+    # 2) the app: encrypt and decrypt a file for real, and keep every screen ----
+    print("[2/8] the app's screens")
+    record_states(not args.skip_capture)
+
+    # 3) the scenes' sound-effect cues ----------------------------------------
+    print("[3/8] cues")
     cues = os.path.join(HERE, "cues.json")
     run([PY, capture_py, "--cues", cues])
 
-    # 3) frames --------------------------------------------------------------
+    # 4) frames --------------------------------------------------------------
     if not args.skip_capture:
         workers = max(1, args.workers)
-        print(f"[3/7] capture frames  ({workers} worker{'s' if workers > 1 else ''})")
+        print(f"[4/8] capture frames  ({workers} worker{'s' if workers > 1 else ''})")
         if os.path.isdir(FRAMES):
             shutil.rmtree(FRAMES)
         os.makedirs(FRAMES, exist_ok=True)
@@ -131,8 +146,8 @@ def main():
         if max(p.wait() for p in procs) != 0:
             sys.exit("capture failed")
 
-    # 4) audio ---------------------------------------------------------------
-    print("[4/7] audio")
+    # 5) audio ---------------------------------------------------------------
+    print("[5/8] audio")
     voice = os.path.join(HERE, "narration_norm.wav")
     loudnorm(os.path.join(HERE, "narration.wav"), voice, -16)
     sfx = os.path.join(HERE, "sfx.wav")
@@ -156,11 +171,11 @@ def main():
     mix = os.path.join(HERE, "mix.wav")
     loudnorm(pre, mix, -14, -1.0)       # streaming loudness, true peak under -1 dB
 
-    # 5) video-only ----------------------------------------------------------
-    print("[5/7] encode video")
+    # 6) video-only ----------------------------------------------------------
+    print("[6/8] encode video")
     video_only = os.path.join(HERE, "video_only.mp4")
     # supersampled frames -> 1080p (lanczos), tagged BT.709 so players don't
-    # shift the colours, then a whisper of temporal grain against banding
+    # shift the colours (and optional temporal grain: --grain)
     vf = ("scale=1920:1080:flags=lanczos:out_color_matrix=bt709:out_range=tv,"
           f"noise=alls={args.grain}:allf=t+u,format=yuv420p")
     run(["ffmpeg", "-v", "error", "-stats", "-y", "-framerate", str(fps), "-i", os.path.join(FRAMES, "f%05d.png"),
@@ -168,13 +183,13 @@ def main():
          "-profile:v", "high", "-level", "4.2", "-colorspace", "bt709", "-color_primaries", "bt709",
          "-color_trc", "bt709", "-color_range", "tv", "-movflags", "+faststart", video_only])
 
-    # 6) captions ------------------------------------------------------------
-    print("[6/7] captions")
+    # 7) captions ------------------------------------------------------------
+    print("[7/8] captions")
     n = write_srt(timeline, os.path.join(CAPTIONS, "vault-video.srt"))
     print(f"      {n} cues -> captions/vault-video.srt (sidecar, off by default)")
 
-    # 7) mux -----------------------------------------------------------------
-    print("[7/7] mux")
+    # 8) mux -----------------------------------------------------------------
+    print("[8/8] mux")
     out = os.path.abspath(os.path.expanduser(args.output))
     os.makedirs(os.path.dirname(out), exist_ok=True)
     run(["ffmpeg", "-v", "error", "-y", "-i", video_only, "-i", mix,

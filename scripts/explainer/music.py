@@ -3,9 +3,9 @@
 
 Synthesized from scratch (no samples, no licensing), so the video never depends
 on a music asset. The arrangement is read from timeline.json and cues.json:
-the beat grid is anchored on the opening shield hit, every section change snaps
-to that grid, and risers land exactly on the two hits. The voice is ducked
-over it later, in build.py.
+the beat grid is anchored on the opening hit (the mark is inked), every section
+change snaps to that grid, and risers land exactly on the two hits. The voice
+is ducked over it later, in build.py.
 
   open      pad swell + riser  ->  hit  ->  pad, sub, sparse pluck
   demo      kick, bass, offbeat hats
