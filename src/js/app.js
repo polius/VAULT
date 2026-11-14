@@ -1,6 +1,7 @@
-// VAULT UI. One object, the file bar, carries the selection, the progress and
-// the result; under it the page moves through four views: pick -> job -> work
-// -> done. All crypto lives in format.js; this file only wires it to the page.
+// VAULT UI. The page moves through four views: pick -> job -> work -> done.
+// The file's name stays at the top of all but the first, and the seal beside
+// it shows what is happening: blank, being drawn, sealed, or broken open. All
+// crypto lives in format.js; this file only wires it to the page.
 
 import {
   archiveName,
@@ -14,6 +15,7 @@ import {
 } from './files.js';
 import { E, encrypt, encryptedSize, fileSource, inspect, unlock } from './format.js';
 import { generatePassphrase, passphraseBits } from './passphrase.js';
+import { createSeal, drawBand, sealNumber } from './seal.js';
 import { openSink, preferredMode, registerServiceWorker, sweepLegacyStaging } from './sink.js';
 import { attackerSentence, estimate, loadDictionaries, meterPhrase, rate } from './strength.js';
 import { planZip, zipStream } from './zip.js';
@@ -42,15 +44,14 @@ const ui = Object.fromEntries(
     'dropText',
     'stateTitle',
     'bar',
-    'selIcon',
     'selName',
     'selMeta',
-    'fillIcon',
-    'fillName',
-    'fillMeta',
     'progress',
-    'progressFill',
     'clearBtn',
+    'seal',
+    'sealNo',
+    'plateKey',
+    'band',
     'job',
     'fileList',
     'fileListSummary',
@@ -112,6 +113,7 @@ const state = {
   session: null, // unlocked decrypt session waiting for a save location
   controller: null,
   sink: null,
+  salt: null, // salt of the file being encrypted, once format.js has drawn it
   results: [], // in-memory results that can be downloaded again
   resume: null,
   dicts: null,
@@ -181,7 +183,10 @@ function encryptLabel() {
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const sizeOf = (files) => files.reduce((n, f) => n + f.file.size, 0);
 
-// ---------- the bar ----------
+// ---------- the file and its seal ----------
+
+const seal = createSeal(ui.seal);
+const DEFAULT_KEY = ui.plateKey.textContent;
 
 // A long name loses its middle, never its extension: the tail never shrinks.
 // Names with right-to-left text stay whole and shorten at the end instead.
@@ -202,26 +207,50 @@ function nameNodes(name) {
   return [head, tail];
 }
 
+// 0 to 100: the line under the percentage.
 function setFill(pct) {
-  ui.bar.style.setProperty('--fill', String(pct));
+  ui.progress.style.setProperty('--p', (pct / 100).toFixed(4));
+}
+
+// "58%", with a smaller sign; empty while there is nothing to count.
+function setPct(pct) {
+  if (pct === null) {
+    ui.workPct.replaceChildren();
+    return;
+  }
+  const sign = document.createElement('small');
+  sign.textContent = '%';
+  ui.workPct.replaceChildren(String(pct), sign);
 }
 
 // state: empty | open | sealing | sealed | opening | opened
-function setBar({ state: s, name = '', meta = '', glyph = 'i-file', fill = 0 }) {
+function setBar({ state: s, name = '', meta = '' }) {
   ui.bar.dataset.state = s;
-  for (const [n, m, g] of [
-    [ui.selName, ui.selMeta, ui.selIcon],
-    [ui.fillName, ui.fillMeta, ui.fillIcon],
-  ]) {
-    n.replaceChildren(...nameNodes(name));
-    m.textContent = meta;
-    setIcon(g, glyph);
-  }
+  ui.selName.replaceChildren(...nameNodes(name));
   ui.selName.title = name;
-  setFill(fill);
+  ui.selMeta.textContent = meta;
 }
 
-// The word above the bar names the state, so it never rests on colour alone.
+// The four lines beside the seal. info: inspect() result of a .vault file, if any.
+function setPlate(info, salt = info?.salt) {
+  ui.sealNo.textContent = salt ? sealNumber(salt) : 'Drawn when the file is encrypted';
+  ui.sealNo.className = salt ? 'num' : 'wait';
+  if (!info) ui.plateKey.textContent = DEFAULT_KEY;
+  else if (info.version === 3) {
+    const { m, t } = info.params;
+    ui.plateKey.textContent = `Argon2id, ${Math.round(m / 1024)} MiB, ${t} ${t === 1 ? 'pass' : 'passes'}`;
+  } else ui.plateKey.textContent = `PBKDF2-SHA-512, ${info.params.iterations.toLocaleString('en')} rounds`;
+}
+
+// The seal follows the selection: a .vault file shows its own, anything else the blank one.
+function renderSeal() {
+  const info = state.mode === 'decrypt' && !state.infoError ? state.info : null;
+  if (info) seal.sealed(info.salt);
+  else seal.blank();
+  setPlate(info);
+}
+
+// The word above the name says the state, so it never rests on colour alone.
 function setTitle(text) {
   ui.stateTitle.textContent = text;
   ui.stateTitle.hidden = !text;
@@ -279,20 +308,29 @@ function explain(err, context) {
 
 // ---------- progress ----------
 
-// drain: decrypting empties a filled bar; encrypting fills an empty one.
-function makeProgress(verb, name, { drain = false } = {}) {
+// The seal is drawn while encrypting ('seal') and its rings turn back while
+// decrypting ('open'). salt: known up front for a .vault file; when encrypting,
+// format.js reports the one it drew with the key phase.
+function makeProgress(verb, name, salt = null) {
+  const kind = verb === 'Encrypting' ? 'seal' : 'open';
   let started = 0;
   let painted = 0;
   let slowNote = 0;
-  const phase = (p) => {
+  const phase = (p, detail) => {
     const kdf = p === 'kdf';
     clearTimeout(slowNote);
+    if (detail?.salt) {
+      salt = detail.salt;
+      state.salt = salt;
+      setPlate(null, salt);
+    }
     if (kdf) {
       ui.bar.dataset.kdf = '';
-      setFill(drain ? 100 : 4);
+      setFill(0);
+      setPct(0);
+      if (salt) seal.start(salt, kind);
       ui.workPhase.textContent =
         verb === 'Encrypting' ? 'Deriving a key from your password…' : 'Checking the password…';
-      ui.workPct.textContent = '';
       ui.workStats.textContent = '';
       ui.progress.removeAttribute('aria-valuenow');
       ui.progress.removeAttribute('aria-valuetext');
@@ -305,6 +343,7 @@ function makeProgress(verb, name, { drain = false } = {}) {
     } else {
       delete ui.bar.dataset.kdf;
       started = performance.now();
+      if (salt) seal.run(salt, kind);
       ui.workPhase.textContent = `${verb}…`;
       ui.workStats.textContent = '';
       update(0, 1, true);
@@ -316,10 +355,11 @@ function makeProgress(verb, name, { drain = false } = {}) {
     painted = now;
     const pct = total ? Math.min(100, (done / total) * 100) : 100;
     const rounded = Math.floor(pct);
-    setFill(drain ? 100 - pct : pct);
+    setFill(pct);
+    seal.progress(pct / 100);
     ui.progress.setAttribute('aria-valuenow', String(rounded));
     ui.progress.setAttribute('aria-valuetext', `${rounded}%`);
-    ui.workPct.textContent = `${rounded}%`;
+    setPct(rounded);
     // The tab says how far it got, for people who switch away (audit F8).
     document.title = `${rounded}% · ${verb} ${name}`;
     const secs = (now - started) / 1000;
@@ -349,9 +389,7 @@ function renderBar() {
     setBar({
       state: 'sealed',
       name: many ? `${state.queue.length} VAULT files` : files[0].file.name,
-      meta: formatBytes(sizeOf(files)),
-      glyph: 'i-lock',
-      fill: 100,
+      meta: `${formatBytes(sizeOf(files))} · ${many ? 'VAULT files' : 'a VAULT file'}`,
     });
     return;
   }
@@ -362,7 +400,6 @@ function renderBar() {
     state: 'open',
     name: single ? files[0].file.name : archiveName(state.selection).replace(/\.zip$/, ''),
     meta: parts.join(' · '),
-    glyph: single ? 'i-file' : 'i-files',
   });
 }
 
@@ -479,6 +516,7 @@ function renderJob() {
   renderVaultInfo();
   renderSwitch();
   renderSaveAs();
+  renderSeal();
 }
 
 function setMode(mode) {
@@ -633,6 +671,8 @@ function reset() {
   setMessage(null);
   setBar({ state: 'empty' });
   setTitle('');
+  seal.blank();
+  setPlate(null);
   show('pick');
   ui.pickFilesBtn.focus();
 }
@@ -752,7 +792,8 @@ async function generatePhrase() {
 function begin(mode) {
   ui.app.dataset.mode = mode;
   setMessage(null);
-  ui.workPct.textContent = '';
+  setPct(null);
+  setFill(0);
   ui.workStats.textContent = '';
   ui.workPhase.textContent = 'Starting…';
   ui.cancelBtn.disabled = false;
@@ -762,7 +803,7 @@ function begin(mode) {
   ui.cancelBtn.focus();
 }
 
-// Back to the form, with the bar showing the selection again.
+// Back to the form, with the file and its seal showing the selection again.
 function backToJob() {
   show('job');
   renderJob();
@@ -799,6 +840,7 @@ function fail(err, context) {
   setMessage(kind, text);
   announce(text);
   if (err?.code === E.WRONG_PASSWORD) {
+    seal.deny();
     // Keep it: the person is still here, and needs it to find the typo (audit F10).
     ui.decPwd.focus();
     ui.decPwd.select();
@@ -810,12 +852,13 @@ function fail(err, context) {
 const savedWhere = (mode) => (mode === 'fs' ? 'Saved where you chose' : 'Sent to your browser’s downloads');
 
 // notes: short sentences, one line each on a laptop.
-function finish({ title, bar, size, where, notes = [] }) {
+function finish({ title, bar, size, where, notes = [], seal: showSeal }) {
   state.sink = null;
   state.controller = null;
   clearSecrets();
   setTitle(title);
   setBar(bar);
+  showSeal();
   ui.doneMeta.textContent = where;
   ui.downloadAgain.hidden = !state.results.length;
   ui.downloadAgain.textContent = state.results.length > 1 ? 'Download them again' : 'Download again';
@@ -922,7 +965,8 @@ async function startEncrypt() {
 
   begin('encrypt');
   const barName = ui.selName.title;
-  setBar({ state: 'sealing', name: barName, meta: ui.selMeta.textContent, glyph: 'i-lock', fill: 0 });
+  setBar({ state: 'sealing', name: barName, meta: ui.selMeta.textContent });
+  state.salt = null;
   const { signal } = state.controller;
   const progress = makeProgress('Encrypting', barName);
   try {
@@ -947,7 +991,8 @@ async function startEncrypt() {
     const many = job.meta.type === 'zip';
     finish({
       title: 'Encrypted',
-      bar: { state: 'sealed', name: state.sink.name, meta: formatBytes(outSize), glyph: 'i-lock', fill: 100 },
+      bar: { state: 'sealed', name: state.sink.name, meta: formatBytes(outSize) },
+      seal: () => seal.sealed(state.salt, { stamp: true }),
       size: outSize,
       where: savedWhere(mode),
       notes: [
@@ -990,8 +1035,9 @@ async function unlockNext(password) {
   const total = state.decrypted.length + state.queue.length;
   state.info = info;
   setTitle(total > 1 ? `Decrypting ${state.decrypted.length + 1} of ${total}` : 'Decrypting');
-  setBar({ state: 'sealed', name: file.name, meta: formatBytes(file.size), glyph: 'i-lock', fill: 100 });
-  const progress = makeProgress('Decrypting', file.name, { drain: true });
+  setBar({ state: 'sealed', name: file.name, meta: `${formatBytes(file.size)} · a VAULT file` });
+  setPlate(info);
+  const progress = makeProgress('Decrypting', file.name, info.salt);
   try {
     state.session = await unlock(file, password, { info, onPhase: progress.phase });
   } catch (err) {
@@ -1013,9 +1059,9 @@ async function saveDecrypted(progress) {
   if (state.view !== 'work') begin('decrypt');
   const total = state.decrypted.length + state.queue.length;
   if (total > 1) setTitle(`Decrypting ${state.decrypted.length + 1} of ${total}`);
-  // The original name is the first thing VAULT decrypts: show it, then drain the fill.
-  setBar({ state: 'opening', name, meta: formatBytes(session.meta.size), glyph: 'i-unlock', fill: 100 });
-  const run = progress ?? makeProgress('Decrypting', name, { drain: true });
+  // The original name is the first thing VAULT decrypts: show it while the rest follows.
+  setBar({ state: 'opening', name, meta: formatBytes(session.meta.size) });
+  const run = progress ?? makeProgress('Decrypting', name, state.info.salt);
   const { signal } = state.controller;
   try {
     signal.throwIfAborted();
@@ -1075,9 +1121,8 @@ function finishDecrypt() {
       state: 'opened',
       name: one ? items[0].name : plural(items.length, 'file'),
       meta: formatBytes(size),
-      glyph: 'i-unlock',
-      fill: 0,
     },
+    seal: () => seal.broken(state.info.salt),
     size,
     where: savedWhere(items.at(-1).mode),
     notes,
@@ -1087,7 +1132,7 @@ function finishDecrypt() {
 // ---------- wiring ----------
 
 function wire() {
-  // Drag and drop anywhere on the page. Files dropped outside the bar must
+  // Drag and drop anywhere on the page. Files dropped outside the tray must
   // never fall through to the browser, which would open them and leave VAULT.
   let depth = 0;
   const hasFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files');
@@ -1256,7 +1301,9 @@ function boot() {
   wire();
   registerServiceWorker();
   sweepLegacyStaging();
+  drawBand(ui.band);
   setBar({ state: 'empty' });
+  seal.blank();
   show('pick');
   document.documentElement.dataset.ready = 'true';
 }

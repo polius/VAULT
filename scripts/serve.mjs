@@ -18,6 +18,7 @@ const TYPES = {
   '.png': 'image/png',
   '.json': 'application/json',
   '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
 };
 
 // Keep in sync with nginx.conf (a unit test checks this).
