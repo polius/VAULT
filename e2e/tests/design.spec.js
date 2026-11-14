@@ -1,22 +1,35 @@
-// The file bar (audit D1) and the layout problems it settles: the landing
-// sentence leaves with the first file (F2), the bar keeps one height through
-// every state and typing moves nothing (V1), the tab title carries progress
-// (F8), the page fits 320 px (V3) and a phone shows the main button (F2, E3).
+// The layout, and the seal. The landing sentence leaves with the first file
+// (audit F2), the file's name keeps its place through every state and typing
+// moves nothing (V1), the tab title carries progress (F8), the page fits
+// 320 px (V3) and a phone shows the main button (F2, E3). Every .vault file
+// has a seal drawn from its salt: blank, drawn, sealed, broken.
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { capture, decrypt, encrypt, expect, makeFile, openApp, pick, STRONG, test } from './helpers.js';
 
-const barHeight = (page) => page.locator('#bar').evaluate((el) => Math.round(el.getBoundingClientRect().height));
+// Where the file's name sits, while there is one.
+const nameBox = (page) =>
+  page.locator('#selName').evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return r.height ? { top: Math.round(r.top), height: Math.round(r.height) } : null;
+  });
+const sealMode = (page) => page.locator('#seal').getAttribute('data-mode');
+// The salt in a .vault file's header, as the seal number shows it.
+function sealNumberOf(bytes) {
+  const params = JSON.parse(bytes.subarray(9, 9 + bytes.readUInt32LE(5)).toString('utf8'));
+  const hex = Buffer.from(params.salt, 'base64').subarray(0, 6).toString('hex').toUpperCase();
+  return hex.replace(/(.{4})(?=.)/g, '$1 ');
+}
 const appHeight = (page) => page.locator('#app').evaluate((el) => el.getBoundingClientRect().height);
 
-test('the bar keeps one height through every state, and states it in words', async ({ page, work, problems }) => {
+test('the file keeps its place through every state, and a word names each state', async ({ page, work, problems }) => {
   await openApp(page, 'blob');
   const states = [];
   const record = async () =>
     states.push({
       state: await page.locator('#bar').getAttribute('data-state'),
       title: (await page.locator('#stateTitle').isVisible()) ? await page.locator('#stateTitle').textContent() : '',
-      height: await barHeight(page),
+      box: await nameBox(page),
     });
   await record();
   const src = await makeFile(work, 'report-q3.pdf', 20_000);
@@ -38,7 +51,9 @@ test('the bar keeps one height through every state, and states it in words', asy
     ['sealed', 'Decrypt'],
     ['opened', 'Decrypted'],
   ]);
-  expect(new Set(states.map((s) => s.height)).size).toBe(1);
+  // No file on landing; after that the name never moves or changes height.
+  expect(states[0].box).toBeNull();
+  expect(new Set(states.slice(1).map((s) => JSON.stringify(s.box))).size).toBe(1);
   await expect(page.locator('#selName')).toHaveText('report-q3.pdf');
   expect(problems).toEqual([]);
 });
@@ -93,32 +108,111 @@ test('the tab title shows progress, and is restored afterwards (audit F8)', asyn
   expect(problems).toEqual([]);
 });
 
-test('a long name loses its middle, keeps its extension, and shortens the same in both layers', async ({
-  page,
-  work,
-  problems,
-}) => {
+test('a long name loses its middle and keeps its extension', async ({ page, work, problems }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await openApp(page, 'blob');
   const name = `${'quarterly-financial-statement-'.repeat(4)}final.pdf`;
   const src = await makeFile(work, name, 10);
   await pick(page, src.path);
   await expect(page.locator('#selName')).toHaveText(name);
-  const layers = await page.evaluate(() =>
-    ['#selName', '#fillName'].map((id) => {
-      const head = document.querySelector(`${id} .head`);
-      const tail = document.querySelector(`${id} .tail`);
-      return {
-        cut: head.scrollWidth > head.clientWidth,
-        headWidth: Math.round(head.getBoundingClientRect().width),
-        tail: tail.textContent,
-      };
-    }),
-  );
-  expect(layers[0].cut).toBe(true);
-  expect(layers[0].tail.endsWith('final.pdf')).toBe(true);
-  expect(layers[1]).toEqual(layers[0]);
+  const shown = await page.evaluate(() => {
+    const head = document.querySelector('#selName .head');
+    const tail = document.querySelector('#selName .tail');
+    return {
+      cut: head.scrollWidth > head.clientWidth,
+      tail: tail.textContent,
+      fits: document.querySelector('#selName').getBoundingClientRect().right <= window.innerWidth,
+    };
+  });
+  expect(shown.cut).toBe(true);
+  expect(shown.tail.endsWith('final.pdf')).toBe(true);
+  expect(shown.fits).toBe(true);
   expect(problems).toEqual([]);
+});
+
+test('the seal is blank, then drawn from the file\u2019s salt, and the same file shows it again', async ({
+  page,
+  work,
+  problems,
+}) => {
+  await openApp(page, 'blob');
+  expect(await sealMode(page)).toBe('blank');
+  await expect(page.locator('#sealNo')).toHaveText('Drawn when the file is encrypted');
+  const src = await makeFile(work, 'a.txt', 3000);
+  await pick(page, src.path);
+  expect(await sealMode(page)).toBe('blank');
+  const enc = await capture(page, 'blob', null, () => encrypt(page, STRONG), work, 'a.vault');
+  const number = sealNumberOf(enc.bytes);
+  await expect(page.locator('#seal')).toHaveAttribute('data-mode', 'sealed');
+  await expect(page.locator('#sealNo')).toHaveText(number);
+  // Both drawings (large and small) hold the three rings.
+  await expect(page.locator('#seal svg')).toHaveCount(2);
+  await expect(page.locator('#seal .seal-full .seal-ink .seal-ring')).toHaveCount(3);
+  const drawn = () =>
+    page.locator('#seal .seal-full defs path').evaluateAll((paths) => paths.map((p) => p.getAttribute('d')).join(''));
+  const first = await drawn();
+
+  // Back on landing the seal is blank again.
+  await page.click('#againBtn');
+  expect(await sealMode(page)).toBe('blank');
+  await expect(page.locator('#sealNo')).toHaveText('Drawn when the file is encrypted');
+  expect(await drawn()).not.toBe(first);
+
+  // The encrypted file brings its seal with it.
+  const file = path.join(work, 'a.txt.vault');
+  await writeFile(file, enc.bytes);
+  await pick(page, file);
+  await expect(page.locator('#seal')).toHaveAttribute('data-mode', 'sealed');
+  await expect(page.locator('#sealNo')).toHaveText(number);
+  expect(await drawn()).toBe(first);
+
+  // A wrong password leaves it shut; the right one breaks it.
+  await decrypt(page, 'not-the-password');
+  await expect(page.locator('#message')).toBeVisible();
+  await expect(page.locator('#seal')).toHaveClass(/seal-deny/);
+  await expect(page.locator('#seal')).toHaveAttribute('data-mode', 'sealed');
+  await capture(page, 'blob', null, () => decrypt(page, STRONG), work, 'a.out');
+  await expect(page.locator('#seal')).toHaveAttribute('data-mode', 'broken');
+  await expect(page.locator('#seal')).toHaveClass(/seal-split/);
+  await expect(page.locator('#sealNo')).toHaveText(number);
+  expect(problems).toEqual([]);
+});
+
+test('two files encrypted with the same password get different seals', async ({ page, work, problems }) => {
+  await openApp(page, 'blob');
+  const numbers = [];
+  for (const name of ['one.txt', 'two.txt']) {
+    const src = await makeFile(work, name, 10);
+    await pick(page, src.path);
+    const enc = await capture(page, 'blob', null, () => encrypt(page, STRONG), work, `${name}.vault`);
+    await expect(page.locator('#sealNo')).toHaveText(sealNumberOf(enc.bytes));
+    numbers.push(await page.locator('#sealNo').textContent());
+    await page.click('#againBtn');
+  }
+  expect(numbers[0]).not.toBe(numbers[1]);
+  expect(problems).toEqual([]);
+});
+
+test.describe('reduced motion', () => {
+  test.use({ reducedMotion: 'reduce' });
+
+  test('the seal still ends sealed, then broken, with nothing turning', async ({ page, work, problems }) => {
+    await openApp(page, 'blob');
+    const src = await makeFile(work, 'calm.txt', 2 * 1048576, 5);
+    await pick(page, src.path);
+    const enc = await capture(page, 'blob', null, () => encrypt(page, STRONG), work, 'calm.vault');
+    await expect(page.locator('#seal')).toHaveAttribute('data-mode', 'sealed');
+    await expect(page.locator('#seal')).not.toHaveClass(/seal-stamp/);
+    const turned = await page.locator('#seal').evaluate((el) => el.style.getPropertyValue('--seal-a1'));
+    expect(turned).toBe('0.00deg');
+    const file = path.join(work, 'calm.txt.vault');
+    await writeFile(file, enc.bytes);
+    await page.click('#againBtn');
+    await pick(page, file);
+    await capture(page, 'blob', null, () => decrypt(page, STRONG), work, 'calm.out');
+    await expect(page.locator('#seal')).toHaveAttribute('data-mode', 'broken');
+    expect(problems).toEqual([]);
+  });
 });
 
 test('the first Tab stop skips the header to the page (audit V4)', async ({ page, problems, browserName }) => {

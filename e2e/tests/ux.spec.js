@@ -434,8 +434,8 @@ test('theme follows the system and the toggle persists (audit L8)', async ({ pag
   await page.emulateMedia({ colorScheme: 'light' });
   await openApp(page, 'blob');
   const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  const LIGHT = 'rgb(244, 244, 240)';
-  const DARK = 'rgb(16, 18, 20)';
+  const LIGHT = 'rgb(241, 243, 238)';
+  const DARK = 'rgb(14, 29, 24)';
   expect(await bg()).toBe(LIGHT);
   await page.emulateMedia({ colorScheme: 'dark' });
   expect(await bg()).toBe(DARK);

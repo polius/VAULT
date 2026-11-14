@@ -24,6 +24,7 @@ Nothing is ever uploaded.
 - **Tamper-evident.** Wrong passwords fail up front; edited or truncated files are rejected.
 - **Large files.** Streams straight to disk where the browser supports it.
 - **Better passwords.** Strength estimate, confirmation field and passphrase generator.
+- **A seal for every file.** Each `.vault` file has its own fine-line seal, drawn from its salt, so you can recognise it at a glance.
 - **Accessible.** Light and dark themes, keyboard and screen-reader friendly.
 
 The `.vault` format is documented in [FORMAT.md](FORMAT.md), and the threat model in [SECURITY.md](SECURITY.md).

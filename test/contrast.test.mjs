@@ -1,6 +1,7 @@
-// Contrast of the colour tokens, computed from app.css itself (audit V2, D1).
-// Text needs 4.5:1 (WCAG 1.4.3); field outlines, the bar's outline and its fill
-// need 3:1 against the paper (WCAG 1.4.11).
+// Contrast of the colour tokens, computed from app.css itself (audit V2).
+// Text needs 4.5:1 (WCAG 1.4.3); field outlines need 3:1 against the paper
+// (WCAG 1.4.11). The seal green is also used for text (the word that names the
+// state, and the second line of the landing sentence), so it is held to 4.5:1.
 import { strict as assert } from 'node:assert';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
@@ -41,18 +42,16 @@ const pairs = [
   ['muted', 'surface', TEXT],
   ['muted', 'soft', TEXT],
   ['danger', 'bg', TEXT],
+  ['danger', 'surface', TEXT],
   ['danger', 'soft', TEXT],
   ['warn', 'bg', TEXT],
   ['warn', 'soft', TEXT],
-  ['on-accent', 'lock', TEXT],
-  ['on-accent', 'lock-hover', TEXT],
-  ['on-accent', 'unlock', TEXT],
-  ['on-accent', 'unlock-hover', TEXT],
+  ['on-seal', 'seal', TEXT],
+  ['on-seal', 'seal-hover', TEXT],
+  ['seal', 'bg', TEXT],
+  ['bg', 'ink', TEXT],
   ['field-line', 'bg', UI],
   ['field-line', 'surface', UI],
-  ['lock', 'bg', UI],
-  ['unlock', 'bg', UI],
-  ['unlock', 'surface', UI],
 ];
 
 for (const [name, theme] of [

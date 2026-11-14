@@ -277,7 +277,8 @@ export async function* encrypt({
   if (frameCount(size, chunk) + 1 > MAX_FRAMES) fail(E.TOO_LARGE, 'File is too large');
   const metaPlain = encodeMeta({ ...meta, size });
   const salt = random(16);
-  onPhase?.('kdf');
+  // The salt is public (it goes in the header); the page draws the file's seal from it.
+  onPhase?.('kdf', { salt: salt.slice() });
   const { key, commit } = await deriveV3(password, salt, kdf);
   signal?.throwIfAborted();
   const params = te.encode(JSON.stringify(paramsFor(kdf, salt, chunk, metaPlain.length, commit)));
