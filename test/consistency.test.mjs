@@ -41,6 +41,55 @@ describe('security headers', () => {
   });
 });
 
+describe('module preloads (audit V4)', () => {
+  // Every module app.js reaches through static imports, so the browser fetches
+  // them all at once rather than discovering them one level at a time.
+  async function staticGraph(entry, seen = new Set()) {
+    for (const [, spec] of (await read(`src/js/${entry}`)).matchAll(/^import\s[^;]*?from\s+'\.\/([^']+)'/gms)) {
+      if (seen.has(spec)) continue;
+      seen.add(spec);
+      await staticGraph(spec, seen);
+    }
+    return seen;
+  }
+
+  it('index.html preloads exactly the modules app.js imports statically', async () => {
+    const preloaded = [...html.matchAll(/<link rel="modulepreload" href="js\/([^"]+)">/g)].map((m) => m[1]);
+    assert.deepEqual(preloaded.toSorted(), [...(await staticGraph('app.js'))].toSorted());
+  });
+});
+
+describe('icons and link previews (audit V4)', () => {
+  const pngSize = async (p) => {
+    const b = await readFile(new URL(`../src/${p}`, import.meta.url));
+    assert.equal(b.toString('latin1', 1, 4), 'PNG', `${p} is a PNG`);
+    return `${b.readUInt32BE(16)}x${b.readUInt32BE(20)}`;
+  };
+
+  it('every file the <head> points to exists', async () => {
+    const refs = [...html.matchAll(/<(?:link|meta)\s[^>]*?(?:href|content)="((?:assets\/|manifest)[^"]+)"/g)].map(
+      (m) => m[1],
+    );
+    assert.ok(refs.length >= 4, refs.join(', '));
+    for (const ref of refs) await readFile(new URL(`../src/${ref}`, import.meta.url));
+  });
+
+  it('the preview image is the size the page declares', async () => {
+    const meta = (p) => html.match(new RegExp(`property="og:image:${p}" content="(\\d+)"`))[1];
+    assert.equal(await pngSize('assets/og.png'), `${meta('width')}x${meta('height')}`);
+  });
+
+  it('the manifest icons exist at the sizes it declares, including a maskable one', async () => {
+    const manifest = JSON.parse(await read('src/manifest.json'));
+    assert.equal(manifest.start_url, './');
+    for (const icon of manifest.icons) {
+      if (icon.type === 'image/png') assert.equal(await pngSize(icon.src), icon.sizes, icon.src);
+      else await readFile(new URL(`../src/${icon.src}`, import.meta.url));
+    }
+    assert.ok(manifest.icons.some((i) => i.purpose === 'maskable'));
+  });
+});
+
 describe('source rules', () => {
   it('no inline styles or inline scripts in index.html (style-src and script-src are self only)', () => {
     assert.doesNotMatch(html, /\sstyle="/);

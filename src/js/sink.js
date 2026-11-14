@@ -22,10 +22,15 @@ const SW_HANDSHAKE_TIMEOUT_MS = 5000;
 const SW_START_TIMEOUT_MS = 5000;
 const SW_KEEPALIVE_MS = 10_000;
 
-// Testing override: ?sink=fs|sw|blob forces a mode for one page load.
-function readOverride() {
+// Testing override: ?sink=fs|sw|blob forces a mode for one page load. Only on
+// a local address, so a link to a real deployment can't push a visitor onto
+// the in-memory sink or away from the streaming one.
+const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
+
+export function readOverride(loc = globalThis.location) {
   try {
-    const mode = new URLSearchParams(globalThis.location?.search).get('sink');
+    if (!LOCAL_HOSTS.includes(loc?.hostname)) return null;
+    const mode = new URLSearchParams(loc.search).get('sink');
     return MODES.includes(mode) ? mode : null;
   } catch {
     return null;
