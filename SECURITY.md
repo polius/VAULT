@@ -4,7 +4,7 @@
 
 Please report vulnerabilities privately through [GitHub Security Advisories](https://github.com/polius/vault/security/advisories/new), not in a public issue. Include the steps to reproduce, the browser and VAULT version, and a sample `.vault` file if one is involved (made with a throwaway password).
 
-You can expect a first reply within a week. Fixes are released as soon as they're ready, and reporters are credited in the changelog unless they'd rather not be.
+You can expect a first reply within a week. Fixes are released as soon as they're ready, and reporters are credited in the GitHub release notes unless they'd rather not be.
 
 Only the latest release is supported.
 
@@ -24,7 +24,7 @@ Only the latest release is supported.
 
 - **Weak passwords.** Argon2id makes each guess expensive, but a short or common password can still be guessed. VAULT estimates strength assuming a well-funded attacker (about 100,000 guesses per second) and asks for confirmation below about 50 bits. A generated 6-word passphrase gives about 77 bits.
 - **A compromised device or browser.** Malware, a malicious browser extension or someone with access to your unlocked machine can read files and passwords as you use them.
-- **A compromised server.** Like every web app, VAULT runs the code the server sends. Someone who controls the server (or a CDN in front of it) could serve code that leaks your data. If that's in your threat model, host VAULT yourself, pin the image by digest, and verify its [build provenance](https://github.com/polius/vault/attestations).
+- **A compromised server.** Like every web app, VAULT runs the code the server sends. Someone who controls the server (or a CDN in front of it) could serve code that leaks your data. If that's in your threat model, host VAULT yourself, pin the image by digest, verify its [build provenance](https://github.com/polius/vault/attestations), and [check what the site serves](#check-a-deployment-against-a-release) against the release.
 - **Output of a failed decryption.** When decrypting a large file straight to disk, data is written before the end of the file has been verified. If verification fails later, VAULT stops and reports the file as damaged. In Chromium the partial file is never committed; in other browsers the download is marked as failed. Don't use a partial or failed download.
 - **Lost passwords.** There's no recovery and no back door.
 
@@ -32,4 +32,16 @@ Only the latest release is supported.
 
 - Serve VAULT over HTTPS. Browsers disable the Web Crypto API on insecure origins (other than `localhost`), and without HTTPS the code you receive can be modified in transit.
 - Keep the headers in [`nginx.conf`](nginx.conf), and turn off any feature of a CDN or proxy that rewrites pages or injects scripts (for example Cloudflare's Rocket Loader, Email Address Obfuscation or Web Analytics auto-injection): the CSP will block the injected code and parts of the page may break.
-- The container runs as an unprivileged user and works with a read-only root filesystem; [`deploy/docker-compose.yml`](deploy/docker-compose.yml) shows the recommended hardening.
+- The container runs as an unprivileged user, and also works with a read-only root filesystem (`--read-only --tmpfs /tmp`) if you want it.
+
+### Check a deployment against a release
+
+Every release has a `SHA256SUMS` file listing the SHA-256 of each file the site serves. To check that a VAULT deployment, yours or someone else's, serves exactly the released files (set the version and the address):
+
+```bash
+V=v2.0.3; SITE=https://vault.example.com
+curl -fsSL "https://github.com/polius/vault/releases/download/$V/SHA256SUMS" -o SHA256SUMS
+while read -r sum file; do [ "$(curl -fsS "$SITE/$file" | shasum -a 256 | cut -d' ' -f1)" = "$sum" ] && echo "ok        $file" || echo "DIFFERENT $file"; done < SHA256SUMS
+```
+
+Every line should say `ok`. This checks what the server sends to you, at that moment; it can't prove what it sends to someone else. Releases published before this check was added have no `SHA256SUMS`.
