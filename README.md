@@ -50,7 +50,7 @@ services:
     restart: unless-stopped
 ```
 
-`poliuscorp/vault` follows the latest release. To run exactly the image you checked, pin it by version and digest, for example `poliuscorp/vault:2.0.3@sha256:…` (the digest is on [Docker Hub](https://hub.docker.com/r/poliuscorp/vault/tags) or from `docker buildx imagetools inspect poliuscorp/vault:2.0.3`). Pinning means updates only arrive when you change the line, which is what you want if the server is part of your threat model.
+`poliuscorp/vault` follows the latest release. To run exactly the image you checked, pin it by version and digest, for example `poliuscorp/vault:2.1.0@sha256:…` (the digest is on [Docker Hub](https://hub.docker.com/r/poliuscorp/vault/tags) or from `docker buildx imagetools inspect poliuscorp/vault:2.1.0`). Pinning means updates only arrive when you change the line, which is what you want if the server is part of your threat model.
 
 > [!IMPORTANT]
 > Browsers only allow the cryptography VAULT needs on **HTTPS** pages (or `http://localhost`). Served over plain HTTP from another machine, VAULT shows a notice instead of working. For anything beyond your own computer, use the HTTPS setup below or put VAULT behind your existing reverse proxy.
